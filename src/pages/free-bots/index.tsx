@@ -21,7 +21,7 @@ const FreeBots = observer(() => {
     const { handleFileChange } = load_modal;
     const [loadingBotId, setLoadingBotId] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
-
+ 
     // Map filenames to their XML content
     const botXmlMap: Record<string, string> = {
         'AI V3 UNDER 9.xml': OverUnderSwitcherXml,
@@ -83,6 +83,7 @@ const FreeBots = observer(() => {
         setLoadError(null);
         // Set loading state for this specific bot
         setLoadingBotId(botIndex);
+    
         
         // Set the dashboard tab to Bot Builder (tab index 1)
         dashboard.setActiveTab(1);
@@ -152,7 +153,7 @@ const FreeBots = observer(() => {
         loadBot();
     };
 
-    // Add a scroll animation effect when page loads
+   
     useEffect(() => {
         const cards = document.querySelectorAll('.free-bots__card');
         cards.forEach((card, index) => {
