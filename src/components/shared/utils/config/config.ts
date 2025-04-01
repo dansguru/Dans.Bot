@@ -7,7 +7,7 @@ export const APP_IDS = {
     STAGING: 29934,
     STAGING_BE: 29934,
     STAGING_ME: 29934,
-    PRODUCTION: 69596, 
+    PRODUCTION: 68643, 
     PRODUCTION_BE: 65556,
     PRODUCTION_ME: 65557,
 };
@@ -63,7 +63,7 @@ export const getDefaultAppIdAndUrl = () => {
 
 export const getAppId = () => {
     const stored_app_id = window.localStorage.getItem('config.app_id');
-    if (stored_app_id && stored_app_id !== '69596') {
+    if (stored_app_id && stored_app_id !== '68643') {
         window.localStorage.removeItem('config.app_id');
     }
 
@@ -156,7 +156,7 @@ export const generateOAuthURL = () => {
     const oauth_url = getOauthURL();
     const original_url = new URL(oauth_url);
     
-    const app_id = '69596';
+    const app_id = '68643';
     localStorage.setItem('config.app_id', app_id);
     
     original_url.hostname = 'ws.derivws.com';
@@ -169,7 +169,7 @@ export const generateOAuthURL = () => {
 if (typeof window !== 'undefined') {
     if (isLocal() || isTestLink()) {
         localStorage.removeItem('config.server_url');
-        localStorage.setItem('config.app_id', '69596');
+        localStorage.setItem('config.app_id', '68643');
     }
     
     checkAndSetEndpointFromUrl();
