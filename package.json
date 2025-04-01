@@ -3,7 +3,8 @@
     "private": true,
     "version": "0.0.1",
     "engines": {
-        "node": "18.x"
+        "node": "18.x",
+        "npm": "9.x"
     },
     "scripts": {
         "start": "rsbuild dev",
@@ -179,5 +180,11 @@
         "sass-embedded-win32-arm64": "1.85.1",
         "sass-embedded-win32-ia32": "1.85.1",
         "sass-embedded-win32-x64": "1.85.1"
+    },
+    "overrides": {
+        "@rspack/binding-win32-x64-msvc": {
+            "os": ["win32", "linux", "darwin"],
+            "cpu": ["x64"]
+        }
     }
 }
