@@ -1,9 +1,10 @@
 import { ReactNode } from 'react';
 import { standalone_routes } from '@/components/shared';
 import {
-    LegacyCashierIcon as CashierLogo,
     LegacyHomeNewIcon as TradershubLogo,
+    LegacyCashierIcon as CashierLogo,
     LegacyReportsIcon as ReportsLogo,
+    LegacyTelegramIcon,
 } from '@deriv/quill-icons/Legacy';
 import {
     DerivProductBrandLightDerivBotLogoWordmarkIcon as DerivBotLogo,
@@ -11,24 +12,6 @@ import {
     PartnersProductBrandLightSmarttraderLogoWordmarkIcon as SmarttraderLogo,
 } from '@deriv/quill-icons/Logo';
 import { localize } from '@deriv-com/translations';
-
-export const HEADER_TITLE = 'TRADERSHALL';
-
-export type PlatformsConfig = {
-    active: boolean;
-    buttonIcon: ReactNode;
-    description: string;
-    href: string;
-    icon: ReactNode;
-    showInEU: boolean;
-};
-
-export type MenuItemsConfig = {
-    as: 'a' | 'button';
-    href: string;
-    icon: ReactNode;
-    label: string;
-};
 
 export type TAccount = {
     balance: string;
@@ -40,6 +23,22 @@ export type TAccount = {
     loginid: string;
     token: string;
     type: string;
+};
+
+export type PlatformsConfig = {
+    active: boolean;
+    buttonIcon: ReactNode;
+    description: string;
+    href: string;
+    icon: ReactNode;
+    showInEU: boolean;
+};
+
+export type MenuItemsConfig = {
+    as: 'a';
+    href: string;
+    icon: ReactNode;
+    label: string;
 };
 
 export const platformsConfig: PlatformsConfig[] = [
@@ -62,7 +61,7 @@ export const platformsConfig: PlatformsConfig[] = [
     {
         active: false,
         buttonIcon: <SmarttraderLogo height={24} width={115} />,
-        description: localize("Trade the world's markets with our popular user-friendly platform."),
+        description: localize(`Trade the world's markets with our popular user-friendly platform.`),
         href: standalone_routes.smarttrader,
         icon: <SmarttraderLogo height={32} width={153} />,
         showInEU: false,
@@ -71,9 +70,9 @@ export const platformsConfig: PlatformsConfig[] = [
 
 export const TRADERS_HUB_LINK_CONFIG = {
     as: 'a',
-    href: standalone_routes.traders_hub,
-    icon: <TradershubLogo iconSize='xs' />,
-    label: "Trader's Hub",
+    href: 'https://t.me/ceo_sami',
+    icon: <LegacyTelegramIcon iconSize='xs' />,
+    label: 'Telegram',
 };
 
 export const MenuItems: MenuItemsConfig[] = [

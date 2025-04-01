@@ -19,8 +19,22 @@ const MenuHeader = ({ hideLanguageSetting, openLanguageSetting }: TMenuHeader) =
 
     return (
         <div className='mobile-menu__header'>
-            <Text size={isDesktop ? 'md' : 'lg'} weight='bold'>
-                {localize('Menu')}
+            <Text 
+                size={isDesktop ? 'md' : 'lg'} 
+                weight='bold'
+                style={{
+                    background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    textAlign: 'center',
+                    width: '100%',
+                    padding: '4px 0',
+                    letterSpacing: '0.3px',
+                    textTransform: 'uppercase',
+                    marginBottom: '4px',
+                }}
+            >
+                TRADERSHALL
             </Text>
 
             {!hideLanguageSetting && (

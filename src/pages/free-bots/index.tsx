@@ -178,36 +178,40 @@ const FreeBots = observer(() => {
                 </div>
             )}
             <div className='free-bots__scroll-container'>
-                <div className='free-bots__grid'>
-                    {bots.map((bot, index) => (
-                        <div 
-                            key={index} 
-                            className='free-bots__card'
-                            style={{ 
-                                opacity: 0, 
-                                transform: 'translateY(20px)', 
-                                transition: 'all 0.4s ease-out'
-                            }}
-                        >
-                            <div className='free-bots__card-icon'>{bot.icon}</div>
-                            <div className='free-bots__card-content'>
-                                <h3>{bot.name}</h3>
-                                <p>{bot.description}</p>
-                                <button 
-                                    className={`free-bots__download-btn ${loadingBotId === index ? 'loading' : ''}`}
-                                    onClick={() => handleBotSelect(bot.file, index)}
-                                    disabled={loadingBotId !== null}
-                                >
-                                    {loadingBotId === index ? (
-                                        <span className="loading-spinner"></span>
-                                    ) : (
-                                        <LabelPairedFileArrowDownCaptionRegularIcon height='20px' width='20px' fill='currentColor' />
-                                    )}
-                                    <Localize i18n_default_text={loadingBotId === index ? 'Loading...' : 'Use Bot'} />
-                                </button>
+                <div className="bot-list-container">
+                    <div className='free-bots__grid'>
+                        {bots.map((bot, index) => (
+                            <div 
+                                key={index} 
+                                className='free-bots__card'
+                                style={{ 
+                                    opacity: 0, 
+                                    transform: 'translateY(20px)', 
+                                    transition: 'all 0.4s ease-out'
+                                }}
+                            >
+                                <div className='free-bots__card-icon'>{bot.icon}</div>
+                                <div className='free-bots__card-content'>
+                                    <h3>{bot.name}</h3>
+                                    <p>{bot.description}</p>
+                                    <button 
+                                        className={`free-bots__download-btn ${loadingBotId === index ? 'loading' : ''}`}
+                                        onClick={() => handleBotSelect(bot.file, index)}
+                                        disabled={loadingBotId !== null}
+                                    >
+                                        {loadingBotId === index ? (
+                                            <span>Loading...</span>
+                                        ) : (
+                                            <>
+                                                <LabelPairedFileArrowDownCaptionRegularIcon height='16px' width='16px' />
+                                                <span>Load Bot</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

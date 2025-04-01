@@ -28,6 +28,7 @@ import Dashboard from '../dashboard';
 import RunStrategy from '../dashboard/run-strategy';
 import FreeBots from '../free-bots';
 import ToolsHub from '../tools-hub';
+import DigitCircles from '../analysis-tool';
 
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
@@ -60,7 +61,7 @@ const AppWrapper = observer(() => {
     const { clear } = summary_card;
     const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
     const init_render = React.useRef(true);
-    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'freebots', 'tools-hub'];
+    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'freebots', 'tools-hub', 'digit-circles'];
     const { isDesktop } = useDevice();
     const navigate = useNavigate();
     const location = useLocation();
@@ -279,6 +280,26 @@ const AppWrapper = observer(() => {
                             >
                                 <ToolsHub />
                             </Suspense>
+                        </div>
+                        <div
+                            label={
+                                <>
+                                    <LegacyGuide1pxIcon
+                                        height='16px'
+                                        width='16px'
+                                        fill='var(--text-general)'
+                                        className='icon-general-fill-g-path'
+                                    />
+                                    <Localize i18n_default_text='Digit Circles' />
+                                </>
+                            }
+                            id='id-digit-circles'
+                        >
+                            <div className='digit-circles-wrapper'>
+                                <Suspense fallback={<ChunkLoader message={localize('Please wait, loading digit circles...')} />}>
+                                    <DigitCircles />
+                                </Suspense>
+                            </div>
                         </div>
                     </Tabs>
                 </div>
