@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { localize } from '@deriv-com/translations';
-import { ToggleSwitch, Button, Dialog, Modal } from '@deriv-com/ui';
+import { ToggleSwitch, Button, Modal } from '@deriv-com/ui';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import './trade-replication.scss';
@@ -467,15 +467,8 @@ const TradeReplication = observer(() => {
     if (isLoading) {
         return (
             <div className="trade-replication-container">
-                <div className="trade-replication-loading">
-                    <div className="futuristic-dots-container">
-                        <div className="futuristic-dot"></div>
-                        <div className="futuristic-dot"></div>
-                        <div className="futuristic-dot"></div>
-                        <div className="futuristic-dot"></div>
-                        <div className="futuristic-dot"></div>
-                    </div>
-                    <div className="load-message">Loading Trade Replication...</div>
+                <div className="loading-state">
+                    <p>Loading...</p>
                 </div>
             </div>
         );
@@ -504,6 +497,14 @@ const TradeReplication = observer(() => {
                     >
                         {localize('Log in')}
                     </Button>
+                    <Modal
+                        id="login-modal"
+                        is_open={showLoginDialog}
+                        title={localize('Log in to your account')}
+                        onClose={() => setShowLoginDialog(false)}
+                    >
+                        <p>Please log in to your account to use the Trade Replication feature.</p>
+                    </Modal>
                 </div>
             ) : (
                 <>
@@ -524,133 +525,10 @@ const TradeReplication = observer(() => {
                         </div>
                     ) : (
                         <>
-                            <div className="account-balances-container">
-                                <div className="account-balance-box demo">
-                                    <h3>Demo Account ({demoAccount?.loginid})</h3>
-                                    <div className="balance-amount">{demoAccount?.currency} {formatNumber(demoBalance)}</div>
-                                    <div className={`profit-loss ${demoProfit >= 0 ? 'profit' : 'loss'}`}>
-                                        {demoProfit >= 0 ? '+' : ''}{formatNumber(demoProfit)} {demoAccount?.currency}
-                                    </div>
-                                </div>
-                                
-                                <div className="replication-arrow">
-                                    <span className={`arrow ${isReplicationEnabled ? 'active' : ''}`}>➜</span>
-                                </div>
-                                
-                                <div className="account-balance-box real">
-                                    <h3>Real Account ({realAccount?.loginid})</h3>
-                                    <div className="balance-amount">{realAccount?.currency} {formatNumber(realBalance)}</div>
-                                    <div className={`profit-loss ${realProfit >= 0 ? 'profit' : 'loss'}`}>
-                                        {realProfit >= 0 ? '+' : ''}{formatNumber(realProfit)} {realAccount?.currency}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {activeTrades.length > 0 && (
-                                <div className="active-trades-container">
-                                    <h3>Active Replicated Trades</h3>
-                                    <table className="trades-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Time</th>
-                                                <th>Type</th>
-                                                <th>Amount</th>
-                                                <th>Demo P/L</th>
-                                                <th>Real P/L</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {activeTrades.map(trade => (
-                                                <tr key={trade.realTradeId}>
-                                                    <td>{new Date(trade.timestamp).toLocaleTimeString()}</td>
-                                                    <td>{trade.type}</td>
-                                                    <td>{formatNumber(trade.amount)} {realAccount?.currency}</td>
-                                                    <td className={trade.demoProfit >= 0 ? 'profit' : 'loss'}>
-                                                        {trade.demoProfit >= 0 ? '+' : ''}{formatNumber(trade.demoProfit)}
-                                                    </td>
-                                                    <td className={trade.realProfit >= 0 ? 'profit' : 'loss'}>
-                                                        {trade.realProfit >= 0 ? '+' : ''}{formatNumber(trade.realProfit)}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                            {/* Add your main content here */}
                         </>
                     )}
                 </>
-            )}
-            
-            <div className="trade-replication-explanation">
-                <h3>How Trade Replication Works</h3>
-                <div className="explanation-steps">
-                    <div className="step">
-                        <div className="step-number">1</div>
-                        <div className="step-content">
-                            <h4>Toggle-based Activation</h4>
-                            <p>When enabled, the system monitors your Demo account and replicates trades to your Real account.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="step">
-                        <div className="step-number">2</div>
-                        <div className="step-content">
-                            <h4>Trade Monitoring & Validation</h4>
-                            <p>The system continuously tracks trades in your Demo account, including amounts, types, and conditions.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="step">
-                        <div className="step-number">3</div>
-                        <div className="step-content">
-                            <h4>Real Account Verification</h4>
-                            <p>Before executing, the system verifies your Real account has sufficient funds for the trade.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="step">
-                        <div className="step-number">4</div>
-                        <div className="step-content">
-                            <h4>Risk Management</h4>
-                            <p>Trades are only executed if your Real account balance can support them - protecting you from insufficient funds.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="step">
-                        <div className="step-number">5</div>
-                        <div className="step-content">
-                            <h4>Real-Time Tracking</h4>
-                            <p>Monitor profit/loss in both accounts simultaneously to compare performance.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div className="replication-key-benefits">
-                <h3>Key Benefits</h3>
-                <ul>
-                    <li>✅ User-Controlled Mirroring - No forced replication unless you enable it</li>
-                    <li>✅ Risk Management - Prevents execution if your real balance is too low</li>
-                    <li>✅ Real-time Tracking - Shows profit/loss data in sync with Demo trades</li>
-                    <li>✅ Efficient API Usage - Optimized to prevent API rate limits</li>
-                    <li>✅ Emergency Stop - Disable mirroring at any time</li>
-                </ul>
-            </div>
-            
-            {/* Login Dialog */}
-            {showLoginDialog && (
-                <Dialog
-                    is_visible={showLoginDialog}
-                    title={localize('Login Required')}
-                    confirm_button_text={localize('Log in')}
-                    cancel_button_text={localize('Cancel')}
-                    onConfirm={handleLogin}
-                    onCancel={() => setShowLoginDialog(false)}
-                >
-                    <p>{localize('Sorry, login first.')}</p>
-                    <p>{localize('You need to be logged in to use the Trade Replication feature.')}</p>
-                </Dialog>
             )}
         </div>
     );
