@@ -456,12 +456,45 @@ const TradeReplication = observer(() => {
 
     // Go to login page
     const handleLogin = () => {
-        setShowLoginDialog(true);
+        setShowLoginDialog(false);
+        window.location.href = '/login';
     };
 
     const formatNumber = (num: number) => {
         return num.toFixed(2);
     };
+
+    // Check if user is logged in
+    const checkLoginStatus = useCallback(async () => {
+        try {
+            const response = await useApiBase.authorized.profile.getProfile();
+            if (response.error) {
+                setIsAuthorized(false);
+                return;
+            }
+            
+            // Check for both demo and real accounts
+            const accounts = await useApiBase.authorized.profile.getAccounts();
+            if (accounts.error) {
+                setIsAuthorized(false);
+                return;
+            }
+
+            const demoAccount = accounts.accounts.find(account => account.is_virtual);
+            const realAccount = accounts.accounts.find(account => !account.is_virtual);
+
+            setHasVirtualAccount(!!demoAccount);
+            setHasRealAccount(!!realAccount);
+            setIsAuthorized(true);
+        } catch (error) {
+            setIsAuthorized(false);
+        }
+    }, [useApiBase]);
+
+    // Check login status on component mount
+    useEffect(() => {
+        checkLoginStatus();
+    }, [checkLoginStatus]);
 
     // Show loading state
     if (isLoading) {
@@ -497,14 +530,6 @@ const TradeReplication = observer(() => {
                     >
                         {localize('Log in')}
                     </Button>
-                    <Modal
-                        id="login-modal"
-                        is_open={showLoginDialog}
-                        title={localize('Log in to your account')}
-                        onClose={() => setShowLoginDialog(false)}
-                    >
-                        <p>Please log in to your account to use the Trade Replication feature.</p>
-                    </Modal>
                 </div>
             ) : (
                 <>
