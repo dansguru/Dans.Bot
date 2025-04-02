@@ -1,0 +1,318 @@
+.trade-replication-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+    color: var(--text-general);
+}
+
+.trade-replication-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--general-section-1);
+    padding-bottom: 16px;
+}
+
+.trade-replication-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(90deg, #00ccff, #0066ff);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.trade-replication-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toggle-label {
+    font-weight: 500;
+}
+
+.account-balances-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 40px;
+}
+
+.account-balance-box {
+    flex: 1;
+    max-width: 320px;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    text-align: center;
+
+    h3 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    &.demo {
+        background: linear-gradient(135deg, rgba(0, 204, 255, 0.1), rgba(0, 102, 255, 0.05));
+        border: 1px solid rgba(0, 204, 255, 0.2);
+    }
+
+    &.real {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(0, 102, 255, 0.05));
+        border: 1px solid rgba(0, 102, 255, 0.2);
+    }
+}
+
+.balance-amount {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.profit-loss {
+    font-size: 16px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 4px;
+    display: inline-block;
+
+    &.profit {
+        background-color: rgba(51, 203, 127, 0.1);
+        color: #33cb7f;
+    }
+
+    &.loss {
+        background-color: rgba(255, 68, 79, 0.1);
+        color: #ff444f;
+    }
+}
+
+.replication-arrow {
+    display: flex;
+    align-items: center;
+    font-size: 28px;
+    color: #c4c4c4;
+
+    .arrow {
+        transform: scale(1);
+        transition: all 0.3s ease;
+
+        &.active {
+            color: #00a1ff;
+            transform: scale(1.2);
+            animation: pulse 2s infinite;
+        }
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        text-shadow: 0 0 0 rgba(0, 161, 255, 0);
+    }
+    50% {
+        transform: scale(1.2);
+        text-shadow: 0 0 15px rgba(0, 161, 255, 0.8);
+    }
+    100% {
+        transform: scale(1);
+        text-shadow: 0 0 0 rgba(0, 161, 255, 0);
+    }
+}
+
+.trade-replication-explanation {
+    margin-bottom: 40px;
+    padding: 24px;
+    border-radius: 8px;
+    background-color: var(--general-main-1);
+
+    h3 {
+        margin-top: 0;
+        font-size: 20px;
+        margin-bottom: 24px;
+        color: var(--text-prominent);
+    }
+}
+
+.explanation-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.step {
+    display: flex;
+    gap: 16px;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #00ccff, #0066ff);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.step-content {
+    h4 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        color: var(--text-prominent);
+    }
+
+    p {
+        margin: 0;
+        line-height: 1.5;
+        color: var(--text-general);
+    }
+}
+
+.replication-key-benefits {
+    padding: 24px;
+    border-radius: 8px;
+    background-color: var(--general-main-1);
+
+    h3 {
+        margin-top: 0;
+        font-size: 20px;
+        margin-bottom: 16px;
+        color: var(--text-prominent);
+    }
+
+    ul {
+        padding-left: 20px;
+        margin: 0;
+
+        li {
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+    }
+}
+
+.validation-error {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 8px;
+    background-color: rgba(255, 68, 79, 0.1);
+    color: #ff444f;
+    text-align: center;
+}
+
+/* New styles for login and account requirements messages */
+.not-logged-in-message, 
+.account-requirement-message {
+    text-align: center;
+    padding: 40px;
+    margin-bottom: 32px;
+    border-radius: 8px;
+    background-color: rgba(0, 161, 255, 0.05);
+    border: 1px dashed rgba(0, 161, 255, 0.3);
+
+    p {
+        margin: 0 0 16px;
+        color: var(--text-general);
+    }
+
+    button {
+        margin-top: 8px;
+    }
+}
+
+/* Styles for loading state */
+.trade-replication-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+/* Active trades table */
+.active-trades-container {
+    margin-bottom: 40px;
+
+    h3 {
+        font-size: 20px;
+        margin: 0 0 16px;
+        color: var(--text-prominent);
+    }
+}
+
+.trades-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    th, td {
+        padding: 12px 16px;
+        text-align: left;
+    }
+
+    th {
+        background-color: var(--general-main-1);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    tr:nth-child(even) {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    tr:hover {
+        background-color: rgba(0, 161, 255, 0.05);
+    }
+
+    .profit {
+        color: #33cb7f;
+    }
+
+    .loss {
+        color: #ff444f;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .account-balances-container {
+        flex-direction: column;
+    }
+
+    .account-balance-box {
+        max-width: 100%;
+    }
+
+    .replication-arrow {
+        transform: rotate(90deg);
+        margin: 16px 0;
+    }
+
+    .trade-replication-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .trade-replication-toggle {
+        align-self: flex-end;
+    }
+    
+    .trades-table {
+        font-size: 14px;
+        
+        th, td {
+            padding: 8px;
+        }
+    }
+}

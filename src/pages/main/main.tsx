@@ -29,6 +29,7 @@ import RunStrategy from '../dashboard/run-strategy';
 import FreeBots from '../free-bots';
 import ToolsHub from '../tools-hub';
 import DigitCircles from '../analysis-tool';
+import TradeReplication from '../trade-replication';
 
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
@@ -214,6 +215,26 @@ const AppWrapper = observer(() => {
                                 fallback={<ChunkLoader message={localize('Please wait, loading tools Analysis...')} />}
                             >
                                 <ToolsHub />
+                            </Suspense>
+                        </div>
+                        <div
+                            label={
+                                <>
+                                    <LegacyGuide1pxIcon
+                                        height='16px'
+                                        width='16px'
+                                        fill='var(--text-general)'
+                                        className='icon-general-fill-g-path'
+                                    />
+                                    <Localize i18n_default_text='Trade Replication' />
+                                </>
+                            }
+                            id='id-trade-replication'
+                        >
+                            <Suspense
+                                fallback={<ChunkLoader message={localize('Please wait, loading Trade Replication...')} />}
+                            >
+                                <TradeReplication />
                             </Suspense>
                         </div>
                         <div
