@@ -199,6 +199,68 @@ const AppWrapper = observer(() => {
                         <div
                             label={
                                 <>
+                                    <LegacyGuide1pxIcon
+                                        height='16px'
+                                        width='16px'
+                                        fill='var(--text-general)'
+                                        className='icon-general-fill-g-path'
+                                    />
+                                    <Localize i18n_default_text='Tools Hub' />
+                                </>
+                            }
+                            id='id-tools-hub'
+                        >
+                            <Suspense
+                                fallback={<ChunkLoader message={localize('Please wait, loading tools hub...')} />}
+                            >
+                                <ToolsHub />
+                            </Suspense>
+                        </div>
+                        <div
+                            label={
+                                <>
+                                    <LegacyGuide1pxIcon
+                                        height='16px'
+                                        width='16px'
+                                        fill='var(--text-general)'
+                                        className='icon-general-fill-g-path'
+                                    />
+                                    <Localize i18n_default_text='freebots🎉' />
+                                </>
+                            }
+                            id='id-freebots'
+                        >
+                            <div className='freebots-wrapper'>
+                                <Suspense
+                                    fallback={<ChunkLoader message={localize('Please wait, loading freebots...')} />}
+                                >
+                                    <FreeBots />
+                                </Suspense>
+                            </div>
+                        </div>
+                        <div
+                            label={
+                                <>
+                                    <LegacyGuide1pxIcon
+                                        height='16px'
+                                        width='16px'
+                                        fill='var(--text-general)'
+                                        className='icon-general-fill-g-path'
+                                    />
+                                    <Localize i18n_default_text='Digit Circles' />
+                                </>
+                            }
+                            id='id-digit-circles'
+                        >
+                            <div className='digit-circles-wrapper'>
+                                <Suspense fallback={<ChunkLoader message={localize('Please wait, loading digit circles...')} />}>
+                                    <DigitCircles />
+                                </Suspense>
+                            </div>
+                        </div>
+                        <div
+                            label={
+                                <>
                                     <LabelPairedChartLineCaptionRegularIcon
                                         height='24px'
                                         width='24px'
@@ -236,68 +298,6 @@ const AppWrapper = observer(() => {
                                     fallback={<ChunkLoader message={localize('Please wait, loading tutorials...')} />}
                                 >
                                     <Tutorial handleTabChange={handleTabChange} />
-                                </Suspense>
-                            </div>
-                        </div>
-                        <div
-                            label={
-                                <>
-                                    <LegacyGuide1pxIcon
-                                        height='16px'
-                                        width='16px'
-                                        fill='var(--text-general)'
-                                        className='icon-general-fill-g-path'
-                                    />
-                                    <Localize i18n_default_text='freebots🎉' />
-                                </>
-                            }
-                            id='id-freebots'
-                        >
-                            <div className='freebots-wrapper'>
-                                <Suspense
-                                    fallback={<ChunkLoader message={localize('Please wait, loading freebots...')} />}
-                                >
-                                    <FreeBots />
-                                </Suspense>
-                            </div>
-                        </div>
-                        <div
-                            label={
-                                <>
-                                    <LegacyGuide1pxIcon
-                                        height='16px'
-                                        width='16px'
-                                        fill='var(--text-general)'
-                                        className='icon-general-fill-g-path'
-                                    />
-                                    <Localize i18n_default_text='Tools Hub' />
-                                </>
-                            }
-                            id='id-tools-hub'
-                        >
-                            <Suspense
-                                fallback={<ChunkLoader message={localize('Please wait, loading tools hub...')} />}
-                            >
-                                <ToolsHub />
-                            </Suspense>
-                        </div>
-                        <div
-                            label={
-                                <>
-                                    <LegacyGuide1pxIcon
-                                        height='16px'
-                                        width='16px'
-                                        fill='var(--text-general)'
-                                        className='icon-general-fill-g-path'
-                                    />
-                                    <Localize i18n_default_text='Digit Circles' />
-                                </>
-                            }
-                            id='id-digit-circles'
-                        >
-                            <div className='digit-circles-wrapper'>
-                                <Suspense fallback={<ChunkLoader message={localize('Please wait, loading digit circles...')} />}>
-                                    <DigitCircles />
                                 </Suspense>
                             </div>
                         </div>

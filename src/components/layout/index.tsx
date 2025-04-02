@@ -11,10 +11,18 @@ import SSOLoader from '../sso-loader';
 import Footer from './footer';
 import AppHeader from './header';
 import Body from './main-body';
+import SplashScreen from '../splash-screen';
 import './layout.scss';
 
 const Layout = () => {
     const { isDesktop } = useDevice();
+    //SPLASH SCREEN IKO HAPA
+    const [showSplash, setShowSplash] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setShowSplash(false), 10000); // Hide splash after 10 seconds
+        return () => clearTimeout(timer);
+    }, []);//HADI HAPA
 
     const { isOAuth2Enabled, isSingleLoggingIn } = useOauth2();
 
@@ -164,6 +172,7 @@ const Layout = () => {
 
     return (
         <div className={clsx('layout', { responsive: isDesktop })}>
+            {showSplash && <SplashScreen />}
             {!isCallbackPage && !isSingleLoggingIn && <AppHeader />}
             <Body>
                 {isSingleLoggingIn && <SSOLoader />}

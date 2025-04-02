@@ -32,13 +32,10 @@ const Footer = () => {
         <footer className='app-footer'>
             <FullScreen />
             <LanguageSettings openLanguageSettingModal={openLanguageSettingModal} />
-            <HelpCentre />
+        
             <div className='app-footer__vertical-line' />
             <ChangeTheme />
-            <AccountLimits />
-            <ResponsibleTrading />
-            <Deriv />
-            <Livechat />
+           
             {cs_chat_whatsapp && <WhatsApp />}
             <div className='app-footer__vertical-line' />
             <ServerTime />
