@@ -205,13 +205,13 @@ const AppWrapper = observer(() => {
                                         fill='var(--text-general)'
                                         className='icon-general-fill-g-path'
                                     />
-                                    <Localize i18n_default_text='Tools Hub' />
+                                    <Localize i18n_default_text='Tool Analysis' />
                                 </>
                             }
                             id='id-tools-hub'
                         >
                             <Suspense
-                                fallback={<ChunkLoader message={localize('Please wait, loading tools hub...')} />}
+                                fallback={<ChunkLoader message={localize('Please wait, loading tools Analysis...')} />}
                             >
                                 <ToolsHub />
                             </Suspense>

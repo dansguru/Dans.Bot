@@ -18,10 +18,22 @@
     }
 
     &__title {
-        color: #000;
+        color: transparent;
         font-size: 24px;
         text-align: center;
         font-weight: bold;
         margin: 0;
+        background: linear-gradient(90deg, #00ccff, #ffffff, #0066ff);
+        background-size: 200% auto;
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shine 3s linear infinite;
+    }
+}
+
+@keyframes shine {
+    to {
+        background-position: 200% center;
     }
 }

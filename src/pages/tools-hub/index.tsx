@@ -43,7 +43,7 @@ const ToolsHub: React.FC = () => {
                         transform: 'translate(-50%, -50%)',
                         zIndex: 1
                     }}>
-                        <ChunkLoader message={localize('Loading Deriv Tools Hub...')} />
+                        <ChunkLoader message={localize('Loading Tradershall Tool Analysis...')} />
                     </div>
                 )}
 
@@ -56,26 +56,9 @@ const ToolsHub: React.FC = () => {
                         textAlign: 'center',
                         zIndex: 2
                     }}>
-                        <h3>{localize('Unable to load Deriv Tools Hub')}</h3>
+                        <h3>{localize('Unable to load Tradershall Tool Analysis')}</h3>
                         <p>{localize('This could be due to connection issues or content security restrictions.')}</p>
-                        <p>
-                            <a 
-                                href="https://track.deriv.com/_NwZ3I9wtMv4KqFKZ7JdnQ2Nd7ZgqdRLk/1/" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                style={{
-                                    display: 'inline-block',
-                                    marginTop: '1rem',
-                                    padding: '0.5rem 1rem',
-                                    background: 'var(--brand-red-coral)',
-                                    color: 'white',
-                                    borderRadius: '4px',
-                                    textDecoration: 'none'
-                                }}
-                            >
-                                {localize('Sign Up')}
-                            </a>
-                        </p>
+                    
                     </div>
                 )}
 

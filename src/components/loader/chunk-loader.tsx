@@ -1,9 +1,9 @@
-import { Loader } from '@deriv-com/ui';
+import FuturisticDotsLoader from './futuristic-dots';
 
 export default function ChunkLoader({ message }: { message: string }) {
     return (
         <div className='app-root'>
-            <Loader />
+            <FuturisticDotsLoader />
             <div className='load-message'>{message}</div>
         </div>
     );
