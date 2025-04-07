@@ -17,7 +17,7 @@ const BlocklyLoading = observer(() => {
                         <div className="futuristic-dot"></div>
                         <div className="futuristic-dot"></div>
                     </div>
-                    <div className="load-message">Loading TraderShall...</div>
+                    <div className="load-message">Loading DANSFX...</div>
                 </div>
             )}
         </>

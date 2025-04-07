@@ -23,7 +23,7 @@ const MenuHeader = ({ hideLanguageSetting, openLanguageSetting }: TMenuHeader) =
                 size={isDesktop ? 'md' : 'lg'} 
                 weight='bold'
                 style={{
-                    background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+                    background: 'linear-gradient(45deg, #ff0000, #ffffff, #000000)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     textAlign: 'center',
@@ -32,9 +32,10 @@ const MenuHeader = ({ hideLanguageSetting, openLanguageSetting }: TMenuHeader) =
                     letterSpacing: '0.3px',
                     textTransform: 'uppercase',
                     marginBottom: '4px',
+                    animation: 'gradientMove 3s ease infinite',
                 }}
             >
-                TRADERSHALL
+                DANS FX
             </Text>
 
             {!hideLanguageSetting && (

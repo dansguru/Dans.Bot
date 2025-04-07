@@ -45,13 +45,19 @@ const Footer = () => {
             {isDesktop && (
                 <div className='app-footer__sliding-text-container'>
                     <div className='app-footer__sliding-text'>
-                        <span>Welcome to TradersHall - Your Ultimate Trading Companion</span>
-                        <span>•</span>
-                        <span>Join our Telegram community for exclusive trading strategies</span>
-                        <span>•</span>
-                        <span>Experience the power of automated trading with our advanced bots</span>
-                        <span>•</span>
-                        <span>24/7 Support Available - We're here to help you succeed</span>
+                        <div className='app-footer__brand'>
+                            <span className='app-footer__brand-name'>DANS</span>
+                            <span className='app-footer__brand-fx'>FX</span>
+                        </div>
+                        <div className='app-footer__messages'>
+                            <span className='app-footer__message'>Welcome to DANSFX - Your Ultimate Trading Companion</span>
+                            <span className='app-footer__separator'>•</span>
+                            <span className='app-footer__message'>Join our Telegram community for exclusive trading strategies</span>
+                            <span className='app-footer__separator'>•</span>
+                            <span className='app-footer__message'>Experience the power of automated trading with our advanced bots</span>
+                            <span className='app-footer__separator'>•</span>
+                            <span className='app-footer__message'>24/7 Support Available - We're here to help you succeed</span>
+                        </div>
                     </div>
                 </div>
             )}

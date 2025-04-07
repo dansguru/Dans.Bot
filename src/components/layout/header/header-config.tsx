@@ -70,7 +70,7 @@ export const platformsConfig: PlatformsConfig[] = [
 
 export const TRADERS_HUB_LINK_CONFIG = {
     as: 'a',
-    href: 'https://t.me/ceo_sami',
+    href: 'https://t.me/Dansgedy',
     icon: <LegacyTelegramIcon iconSize='xs' />,
     label: 'Telegram',
 };

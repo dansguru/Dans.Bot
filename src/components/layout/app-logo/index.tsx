@@ -15,9 +15,9 @@ export const AppLogo = () => {
             >
                 <defs>
                     <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#00ccff" />
+                        <stop offset="0%" stopColor="#ff0000" />
                         <stop offset="50%" stopColor="#ffffff" />
-                        <stop offset="100%" stopColor="#0066ff" />
+                        <stop offset="100%" stopColor="#000000" />
                     </linearGradient>
                 </defs>
                 <text 
@@ -29,7 +29,7 @@ export const AppLogo = () => {
                     fill="url(#logo-gradient)"
                     className="logo-text"
                 >
-                    TRADERSHALL
+                    DANS FX
                 </text>
             </svg>
         </a>
