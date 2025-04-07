@@ -216,6 +216,10 @@ const TradeReplication = observer(() => {
     const tradeMonitoringInterval = useRef<NodeJS.Timeout | null>(null);
     const wsConnectionRef = useRef<any>(null);
 
+    // API tokens
+    const DEMO_TOKEN = 'tttL9ROX9d95naR';
+    const REAL_TOKEN = 'aM4HShm3uzo5rXJ';
+
     // Initialize WebSocket connection
     const initializeWebSocket = useCallback(async () => {
         try {
@@ -229,16 +233,20 @@ const TradeReplication = observer(() => {
                 wsConnectionRef.current.disconnect();
             }
 
+            // Initialize WebSocket with demo token
             const ws = await api_base.api?.connect();
             if (!ws) {
                 console.error('Failed to initialize WebSocket connection');
                 return;
             }
 
+            // Authorize with demo token
+            await ws.authorize(DEMO_TOKEN);
+            
             wsConnectionRef.current = ws;
             setWs(ws);
 
-            // Subscribe to balance updates
+            // Subscribe to balance updates for both accounts
             if (demoAccount?.loginid) {
                 await ws.balance.subscribe({
                     subscribe: 1,
@@ -269,20 +277,25 @@ const TradeReplication = observer(() => {
     // Update balances
     const updateBalances = useCallback(async () => {
         try {
-            if (!ws || !demoAccount || !realAccount) return;
+            if (!ws) return;
 
-            const [demoBalanceRes, realBalanceRes] = await Promise.all([
-                ws.authorized.balance({ loginid: demoAccount.loginid }),
-                ws.authorized.balance({ loginid: realAccount.loginid }),
-            ]);
-
+            // Authorize with demo token for demo account balance
+            await ws.authorize(DEMO_TOKEN);
+            const demoBalanceRes = await ws.balance({ loginid: demoAccount?.loginid });
             setDemoBalance(demoBalanceRes.balance);
+
+            // Authorize with real token for real account balance
+            await ws.authorize(REAL_TOKEN);
+            const realBalanceRes = await ws.balance({ loginid: realAccount?.loginid });
             setRealBalance(realBalanceRes.balance);
+
+            // Switch back to demo token for trade monitoring
+            await ws.authorize(DEMO_TOKEN);
         } catch (error) {
             console.error('Error updating balances:', error);
             setError('Failed to update balances');
         }
-    }, [ws, demoAccount, realAccount]);
+    }, [ws, demoAccount?.loginid, realAccount?.loginid]);
 
     // Check if user is logged in and get accounts
     const checkLoginStatus = useCallback(async () => {
@@ -293,15 +306,24 @@ const TradeReplication = observer(() => {
                 return;
             }
 
-            if (!client?.accountList || client.accountList.length === 0) {
-                console.log('No accounts found');
+            // Get accounts from client store
+            const accounts = client.accountList || [];
+            console.log('Available accounts:', accounts);
+
+            if (accounts.length === 0) {
+                console.log('No accounts found in client store');
                 setError('No accounts found');
                 return;
             }
 
-            // Find demo and real accounts from client store
-            const demoAccount = client.accountList.find(account => account.is_virtual);
-            const realAccount = client.accountList.find(account => !account.is_virtual);
+            // Find demo and real accounts
+            const demoAccount = accounts.find(account => account.is_virtual);
+            const realAccount = accounts.find(account => !account.is_virtual);
+
+            console.log('Found accounts:', {
+                demo: demoAccount ? demoAccount.loginid : 'not found',
+                real: realAccount ? realAccount.loginid : 'not found'
+            });
 
             if (!demoAccount) {
                 console.log('No demo account found');
@@ -321,15 +343,13 @@ const TradeReplication = observer(() => {
             setRealAccount(realAccount);
             setError(null); // Clear any previous errors
 
-            console.log('Accounts found:', {
-                demo: demoAccount.loginid,
-                real: realAccount.loginid
-            });
+            // Update balances using API tokens
+            await updateBalances();
         } catch (error) {
             console.error('Failed to check login status:', error);
             setError('Failed to check login status');
         }
-    }, [client?.is_logged_in, client?.accountList]);
+    }, [client?.is_logged_in, client?.accountList, updateBalances]);
 
     // Initialize component
     useEffect(() => {
@@ -339,7 +359,6 @@ const TradeReplication = observer(() => {
                 await checkLoginStatus();
                 if (client?.is_logged_in && hasVirtualAccount && hasRealAccount) {
                     await initializeWebSocket();
-                    await updateBalances();
                 }
             } catch (error) {
                 console.error('Error during initialization:', error);
@@ -360,7 +379,7 @@ const TradeReplication = observer(() => {
                 clearInterval(tradeMonitoringInterval.current);
             }
         };
-    }, [checkLoginStatus, initializeWebSocket, updateBalances, client?.is_logged_in, hasVirtualAccount, hasRealAccount]);
+    }, [checkLoginStatus, initializeWebSocket, client?.is_logged_in, hasVirtualAccount, hasRealAccount]);
 
     // Handle toggle change
     const handleToggleChange = (checked: boolean) => {
