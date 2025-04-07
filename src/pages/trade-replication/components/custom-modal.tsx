@@ -6,6 +6,7 @@ interface CustomModalProps {
     isOpen: boolean;
     onClose: () => void;
     children: React.ReactNode;
+    title?: string;
 }
 
 const CustomModal: React.FC<CustomModalProps> = ({ isOpen, onClose, children }) => {
