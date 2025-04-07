@@ -288,33 +288,29 @@ const TradeReplication = observer(() => {
     const checkLoginStatus = useCallback(async () => {
         try {
             if (!client?.is_logged_in) {
+                console.log('User not logged in');
                 setError('Not logged in');
                 return;
             }
 
-            if (!api_base.api) {
-                console.error('API not initialized');
-                return;
-            }
-            
-            // Get account list
-            const accounts = await api_base.api.getAccountList();
-            if (accounts?.error) {
-                console.error('Failed to get account list:', accounts.error);
-                setError('Failed to get account list');
+            if (!client?.accountList || client.accountList.length === 0) {
+                console.log('No accounts found');
+                setError('No accounts found');
                 return;
             }
 
-            // Find demo and real accounts
-            const demoAccount = accounts.accounts.find((account: TAccount) => account.is_virtual);
-            const realAccount = accounts.accounts.find((account: TAccount) => !account.is_virtual);
+            // Find demo and real accounts from client store
+            const demoAccount = client.accountList.find(account => account.is_virtual);
+            const realAccount = client.accountList.find(account => !account.is_virtual);
 
             if (!demoAccount) {
+                console.log('No demo account found');
                 setError('You need a Demo account to use Trade Replication.');
                 return;
             }
 
             if (!realAccount) {
+                console.log('No real account found');
                 setError('You need a Real account to use Trade Replication.');
                 return;
             }
@@ -324,11 +320,16 @@ const TradeReplication = observer(() => {
             setDemoAccount(demoAccount);
             setRealAccount(realAccount);
             setError(null); // Clear any previous errors
+
+            console.log('Accounts found:', {
+                demo: demoAccount.loginid,
+                real: realAccount.loginid
+            });
         } catch (error) {
             console.error('Failed to check login status:', error);
             setError('Failed to check login status');
         }
-    }, [client?.is_logged_in]);
+    }, [client?.is_logged_in, client?.accountList]);
 
     // Initialize component
     useEffect(() => {
