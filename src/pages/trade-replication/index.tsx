@@ -218,6 +218,65 @@ const TradeReplication = observer(() => {
     // Refs for API calls and intervals
     const tradeMonitoringInterval = useRef<NodeJS.Timeout | null>(null);
 
+    // Initialize WebSocket connection
+    const initializeWebSocket = useCallback(async () => {
+        try {
+            if (!isAuthorized || !client?.is_logged_in) return;
+
+            const ws = await api_base.api?.connect();
+            if (!ws) {
+                console.error('Failed to initialize WebSocket connection');
+                return;
+            }
+
+            setWs(ws);
+
+            // Subscribe to balance updates
+            if (demoAccount?.loginid) {
+                await ws.balance.subscribe({
+                    subscribe: 1,
+                    loginid: demoAccount.loginid,
+                });
+            }
+            if (realAccount?.loginid) {
+                await ws.balance.subscribe({
+                    subscribe: 1,
+                    loginid: realAccount.loginid,
+                });
+            }
+
+            // Handle WebSocket connection state
+            ws.on('connection_state', (state: number) => {
+                console.log('WebSocket connection state:', state);
+                if (state === 3) { // Connection closed
+                    console.log('WebSocket connection closed, attempting to reconnect...');
+                    setTimeout(initializeWebSocket, 5000); // Retry after 5 seconds
+                }
+            });
+        } catch (error) {
+            console.error('Error initializing WebSocket:', error);
+            setError('Failed to initialize WebSocket connection');
+        }
+    }, [isAuthorized, client?.is_logged_in, demoAccount?.loginid, realAccount?.loginid]);
+
+    // Update balances
+    const updateBalances = useCallback(async () => {
+        try {
+            if (!ws || !demoAccount || !realAccount) return;
+
+            const [demoBalanceRes, realBalanceRes] = await Promise.all([
+                ws.authorized.balance({ loginid: demoAccount.loginid }),
+                ws.authorized.balance({ loginid: realAccount.loginid }),
+            ]);
+
+            setDemoBalance(demoBalanceRes.balance);
+            setRealBalance(realBalanceRes.balance);
+        } catch (error) {
+            console.error('Error updating balances:', error);
+            setError('Failed to update balances');
+        }
+    }, [ws, demoAccount, realAccount]);
+
     // Check if user is logged in
     const checkLoginStatus = useCallback(async () => {
         try {
@@ -251,16 +310,41 @@ const TradeReplication = observer(() => {
 
             setHasVirtualAccount(!!demoAccount);
             setHasRealAccount(!!realAccount);
+            setDemoAccount(demoAccount || null);
+            setRealAccount(realAccount || null);
         } catch (error) {
             console.error('Failed to check login status:', error);
             setError('Failed to check login status');
         }
     }, [client?.is_logged_in]);
 
-    // Check login status on component mount and when client login state changes
+    // Initialize component
     useEffect(() => {
-        checkLoginStatus();
-    }, [checkLoginStatus, client?.is_logged_in]);
+        const init = async () => {
+            setIsLoading(true);
+            try {
+                await checkLoginStatus();
+                if (isAuthorized && client?.is_logged_in) {
+                    await initializeWebSocket();
+                    await updateBalances();
+                }
+            } catch (error) {
+                console.error('Error during initialization:', error);
+                setError('Failed to initialize component');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        init();
+
+        // Cleanup function
+        return () => {
+            if (ws) {
+                ws.disconnect();
+            }
+        };
+    }, [checkLoginStatus, initializeWebSocket, updateBalances, isAuthorized, client?.is_logged_in]);
 
     // Handle toggle change
     const handleToggleChange = (checked: boolean) => {
@@ -282,60 +366,6 @@ const TradeReplication = observer(() => {
             console.log('Trade replication enabled. Starting trade monitoring...');
         }
     };
-
-    // Initialize component
-    useEffect(() => {
-        const init = async () => {
-            setIsLoading(true);
-            await checkLoginStatus();
-            if (isAuthorized) {
-                await initializeWebSocket();
-                await updateBalances();
-            }
-            setIsLoading(false);
-        };
-
-        init();
-    }, [checkLoginStatus, initializeWebSocket, updateBalances, isAuthorized]);
-
-    // Initialize WebSocket connection
-    const initializeWebSocket = useCallback(async () => {
-        try {
-            if (!isAuthorized) return;
-
-            const ws = await api_base.api?.connect();
-            setWs(ws);
-
-            // Subscribe to balance updates
-            await ws?.balance.subscribe({
-                subscribe: 1,
-                loginid: demoAccount?.loginid,
-            });
-            await ws?.balance.subscribe({
-                subscribe: 1,
-                loginid: realAccount?.loginid,
-            });
-        } catch (error) {
-            setError('Failed to initialize WebSocket connection');
-        }
-    }, [isAuthorized, demoAccount, realAccount]);
-
-    // Update balances
-    const updateBalances = useCallback(async () => {
-        try {
-            if (!ws || !demoAccount || !realAccount) return;
-
-            const [demoBalanceRes, realBalanceRes] = await Promise.all([
-                ws.authorized.balance({ loginid: demoAccount.loginid }),
-                ws.authorized.balance({ loginid: realAccount.loginid }),
-            ]);
-
-            setDemoBalance(demoBalanceRes.balance);
-            setRealBalance(realBalanceRes.balance);
-        } catch (error) {
-            setError('Failed to update balances');
-        }
-    }, [ws, demoAccount, realAccount]);
 
     // Monitor trades in demo account and replicate to real account
     const startTradeMonitoring = useCallback(() => {
