@@ -212,16 +212,22 @@ const TradeReplication = observer(() => {
     });
     const [confirmationTrade, setConfirmationTrade] = useState<TradeConfirmation | null>(null);
 
-    // API & Auth state
-    const { core } = useStore();
-
     // Refs for API calls and intervals
     const tradeMonitoringInterval = useRef<NodeJS.Timeout | null>(null);
+    const wsConnectionRef = useRef<any>(null);
 
     // Initialize WebSocket connection
     const initializeWebSocket = useCallback(async () => {
         try {
-            if (!isAuthorized || !client?.is_logged_in) return;
+            if (!client?.is_logged_in) {
+                console.log('User not logged in, skipping WebSocket initialization');
+                return;
+            }
+
+            // Clean up existing connection if any
+            if (wsConnectionRef.current) {
+                wsConnectionRef.current.disconnect();
+            }
 
             const ws = await api_base.api?.connect();
             if (!ws) {
@@ -229,6 +235,7 @@ const TradeReplication = observer(() => {
                 return;
             }
 
+            wsConnectionRef.current = ws;
             setWs(ws);
 
             // Subscribe to balance updates
@@ -257,7 +264,7 @@ const TradeReplication = observer(() => {
             console.error('Error initializing WebSocket:', error);
             setError('Failed to initialize WebSocket connection');
         }
-    }, [isAuthorized, client?.is_logged_in, demoAccount?.loginid, realAccount?.loginid]);
+    }, [client?.is_logged_in, demoAccount?.loginid, realAccount?.loginid]);
 
     // Update balances
     const updateBalances = useCallback(async () => {
@@ -290,13 +297,6 @@ const TradeReplication = observer(() => {
                 return;
             }
             
-            const response = await api_base.api.authorize();
-            if (response?.error) {
-                console.error('Authorization failed:', response.error);
-                setError('Authorization failed');
-                return;
-            }
-            
             // Check for both demo and real accounts
             const accounts = await api_base.api.getAccountList();
             if (accounts?.error) {
@@ -324,7 +324,7 @@ const TradeReplication = observer(() => {
             setIsLoading(true);
             try {
                 await checkLoginStatus();
-                if (isAuthorized && client?.is_logged_in) {
+                if (client?.is_logged_in) {
                     await initializeWebSocket();
                     await updateBalances();
                 }
@@ -340,11 +340,14 @@ const TradeReplication = observer(() => {
 
         // Cleanup function
         return () => {
-            if (ws) {
-                ws.disconnect();
+            if (wsConnectionRef.current) {
+                wsConnectionRef.current.disconnect();
+            }
+            if (tradeMonitoringInterval.current) {
+                clearInterval(tradeMonitoringInterval.current);
             }
         };
-    }, [checkLoginStatus, initializeWebSocket, updateBalances, isAuthorized, client?.is_logged_in]);
+    }, [checkLoginStatus, initializeWebSocket, updateBalances, client?.is_logged_in]);
 
     // Handle toggle change
     const handleToggleChange = (checked: boolean) => {
