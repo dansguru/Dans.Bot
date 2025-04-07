@@ -284,7 +284,7 @@ const TradeReplication = observer(() => {
         }
     }, [ws, demoAccount, realAccount]);
 
-    // Check if user is logged in
+    // Check if user is logged in and get accounts
     const checkLoginStatus = useCallback(async () => {
         try {
             if (!client?.is_logged_in) {
@@ -297,7 +297,7 @@ const TradeReplication = observer(() => {
                 return;
             }
             
-            // Check for both demo and real accounts
+            // Get account list
             const accounts = await api_base.api.getAccountList();
             if (accounts?.error) {
                 console.error('Failed to get account list:', accounts.error);
@@ -305,13 +305,25 @@ const TradeReplication = observer(() => {
                 return;
             }
 
+            // Find demo and real accounts
             const demoAccount = accounts.accounts.find((account: TAccount) => account.is_virtual);
             const realAccount = accounts.accounts.find((account: TAccount) => !account.is_virtual);
 
-            setHasVirtualAccount(!!demoAccount);
-            setHasRealAccount(!!realAccount);
-            setDemoAccount(demoAccount || null);
-            setRealAccount(realAccount || null);
+            if (!demoAccount) {
+                setError('You need a Demo account to use Trade Replication.');
+                return;
+            }
+
+            if (!realAccount) {
+                setError('You need a Real account to use Trade Replication.');
+                return;
+            }
+
+            setHasVirtualAccount(true);
+            setHasRealAccount(true);
+            setDemoAccount(demoAccount);
+            setRealAccount(realAccount);
+            setError(null); // Clear any previous errors
         } catch (error) {
             console.error('Failed to check login status:', error);
             setError('Failed to check login status');
@@ -324,7 +336,7 @@ const TradeReplication = observer(() => {
             setIsLoading(true);
             try {
                 await checkLoginStatus();
-                if (client?.is_logged_in) {
+                if (client?.is_logged_in && hasVirtualAccount && hasRealAccount) {
                     await initializeWebSocket();
                     await updateBalances();
                 }
@@ -347,11 +359,11 @@ const TradeReplication = observer(() => {
                 clearInterval(tradeMonitoringInterval.current);
             }
         };
-    }, [checkLoginStatus, initializeWebSocket, updateBalances, client?.is_logged_in]);
+    }, [checkLoginStatus, initializeWebSocket, updateBalances, client?.is_logged_in, hasVirtualAccount, hasRealAccount]);
 
     // Handle toggle change
     const handleToggleChange = (checked: boolean) => {
-        if (!isAuthorized) {
+        if (!client?.is_logged_in) {
             setError('You need to be logged in to use this feature.');
             return;
         }
