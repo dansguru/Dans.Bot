@@ -98,7 +98,6 @@ const TradeReplication = observer(() => {
     const [hasVirtualAccount, setHasVirtualAccount] = useState(false);
     const [hasRealAccount, setHasRealAccount] = useState(false);
     const [isAuthorized, setIsAuthorized] = useState(false);
-    const [showLoginDialog, setShowLoginDialog] = useState(false);
     const [demoAccount, setDemoAccount] = useState<Account | null>(null);
     const [realAccount, setRealAccount] = useState<Account | null>(null);
     const [accountList, setAccountList] = useState<any[]>([]);
@@ -118,83 +117,85 @@ const TradeReplication = observer(() => {
     const tradeMonitoringInterval = useRef<NodeJS.Timeout | null>(null);
     const balanceUpdateInterval = useRef<NodeJS.Timeout | null>(null);
 
-    // Check if user has both demo and real accounts
-    useEffect(() => {
-        if (isAuthorized && accountList?.length) {
-            const virtualAccount = accountList.find(account => account.is_virtual);
-            const nonVirtualAccount = accountList.find(account => !account.is_virtual);
-            
-            setHasVirtualAccount(!!virtualAccount);
-            setHasRealAccount(!!nonVirtualAccount);
-            
-            if (virtualAccount) {
-                setDemoAccount({
-                    loginid: virtualAccount.loginid,
-                    token: '', 
-                    currency: virtualAccount.currency,
-                    is_virtual: true
-                });
-            }
-            
-            if (nonVirtualAccount) {
-                setRealAccount({
-                    loginid: nonVirtualAccount.loginid,
-                    token: '', 
-                    currency: nonVirtualAccount.currency,
-                    is_virtual: false
-                });
-            }
-            
-            setIsLoading(false);
-        } else if (!isAuthorized) {
-            setIsLoading(false);
-        }
-    }, [isAuthorized, accountList]);
-
-    // Fetch account balances
-    const fetchBalances = useCallback(async () => {
-        if (!isAuthorized || !ws || !demoAccount?.loginid || !realAccount?.loginid) return;
-        
+    // Check if user is logged in and has proper accounts
+    const checkAccountStatus = useCallback(async () => {
         try {
-            // Get all account balances
-            const balanceResponse = await ws.authorized.balance();
-            
-            if (balanceResponse.error) {
-                console.error('Balance API error:', balanceResponse.error);
+            // Check if user is logged in
+            const activeLoginid = client?.active_loginid;
+            if (!activeLoginid) {
+                setIsAuthorized(false);
                 return;
             }
-            
-            const accounts = balanceResponse.balance?.accounts || {};
-            
-            // Update demo account balance
-            if (accounts[demoAccount.loginid]) {
-                setDemoBalance(accounts[demoAccount.loginid].balance || 0);
-            }
-            
-            // Update real account balance
-            if (accounts[realAccount.loginid]) {
-                setRealBalance(accounts[realAccount.loginid].balance || 0);
-            }
-        } catch (error) {
-            console.error('Error fetching balances:', error);
-        }
-    }, [isAuthorized, ws, demoAccount?.loginid, realAccount?.loginid]);
 
-    // Start fetching balances when component mounts and accounts are available
-    useEffect(() => {
-        if (isAuthorized && demoAccount && realAccount) {
-            fetchBalances();
-            
-            // Set up interval to update balances regularly
-            balanceUpdateInterval.current = setInterval(fetchBalances, 10000); // Every 10 seconds
-            
-            return () => {
-                if (balanceUpdateInterval.current) {
-                    clearInterval(balanceUpdateInterval.current);
-                }
-            };
+            // Get all accounts
+            const accounts = client?.accounts;
+            if (!accounts) {
+                setIsAuthorized(false);
+                return;
+            }
+
+            // Check for demo account
+            const demoAccount = Object.values(accounts).find(account => account.is_virtual);
+            setHasVirtualAccount(!!demoAccount);
+
+            // Check for real account
+            const realAccount = Object.values(accounts).find(account => !account.is_virtual);
+            setHasRealAccount(!!realAccount);
+
+            // Set account tokens
+            if (demoAccount) {
+                setDemoAccount(demoAccount);
+            }
+            if (realAccount) {
+                setRealAccount(realAccount);
+            }
+
+            // User is authorized if they have both accounts
+            setIsAuthorized(hasVirtualAccount && hasRealAccount);
+        } catch (error) {
+            setIsAuthorized(false);
+            setError('Failed to check account status');
         }
-    }, [isAuthorized, demoAccount, realAccount, fetchBalances]);
+    }, [client]);
+
+    // Initialize WebSocket connection
+    const initializeWebSocket = useCallback(async () => {
+        try {
+            if (!isAuthorized) return;
+
+            const ws = await useApiBase.authorized.connect();
+            setWs(ws);
+
+            // Subscribe to balance updates
+            await ws.authorized.balance.subscribe({
+                subscribe: 1,
+                loginid: demoAccount?.loginid,
+            });
+            await ws.authorized.balance.subscribe({
+                subscribe: 1,
+                loginid: realAccount?.loginid,
+            });
+        } catch (error) {
+            setError('Failed to initialize WebSocket connection');
+        }
+    }, [isAuthorized, demoAccount, realAccount, useApiBase]);
+
+    // Update balances
+    const updateBalances = useCallback(async () => {
+        try {
+            if (!ws || !demoAccount || !realAccount) return;
+
+            const [demoBalanceRes, realBalanceRes] = await Promise.all([
+                ws.authorized.balance({ loginid: demoAccount.loginid }),
+                ws.authorized.balance({ loginid: realAccount.loginid }),
+            ]);
+
+            setDemoBalance(demoBalanceRes.balance);
+            setRealBalance(realBalanceRes.balance);
+        } catch (error) {
+            setError('Failed to update balances');
+        }
+    }, [ws, demoAccount, realAccount]);
 
     // Monitor trades in demo account and replicate to real account
     const startTradeMonitoring = useCallback(() => {
@@ -241,7 +242,7 @@ const TradeReplication = observer(() => {
                 
                 // 2. Process and replicate new trades if any
                 for (const trade of newTrades) {
-                    // Check if we have sufficient balance in real account
+                    // 3. Check if we have sufficient balance in real account
                     if (trade.amount > realBalance) {
                         console.warn(`Insufficient balance to replicate trade: ${trade.transaction_id}`);
                         
@@ -431,35 +432,7 @@ const TradeReplication = observer(() => {
         };
     }, [isReplicationEnabled, startTradeMonitoring]);
 
-    // Handle toggle change
-    const handleToggleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const enabled = event.target.checked;
-        
-        if (!isAuthorized) {
-            setShowLoginDialog(true);
-            return;
-        }
-        
-        if (enabled && (!hasVirtualAccount || !hasRealAccount)) {
-            setError('You need both a Demo account and a Real account to use Trade Replication.');
-            return;
-        }
-        
-        setIsReplicationEnabled(enabled);
-        
-        if (!enabled) {
-            console.log('Trade replication disabled. Existing trades remain active.');
-        } else {
-            console.log('Trade replication enabled. Starting trade monitoring...');
-        }
-    };
-
-    // Go to login page
-    const handleLogin = () => {
-        setShowLoginDialog(false);
-        window.location.href = '/login';
-    };
-
+    // Format numbers to 2 decimal places
     const formatNumber = (num: number) => {
         return num.toFixed(2);
     };
@@ -495,6 +468,44 @@ const TradeReplication = observer(() => {
     useEffect(() => {
         checkLoginStatus();
     }, [checkLoginStatus]);
+
+    // Handle toggle change
+    const handleToggleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const enabled = event.target.checked;
+        
+        if (!isAuthorized) {
+            setError('You need to be logged in to use this feature.');
+            return;
+        }
+        
+        if (enabled && (!hasVirtualAccount || !hasRealAccount)) {
+            setError('You need both a Demo account and a Real account to use Trade Replication.');
+            return;
+        }
+        
+        setIsReplicationEnabled(enabled);
+        
+        if (!enabled) {
+            console.log('Trade replication disabled. Existing trades remain active.');
+        } else {
+            console.log('Trade replication enabled. Starting trade monitoring...');
+        }
+    };
+
+    // Initialize component
+    useEffect(() => {
+        const init = async () => {
+            setIsLoading(true);
+            await checkAccountStatus();
+            if (isAuthorized) {
+                await initializeWebSocket();
+                await updateBalances();
+            }
+            setIsLoading(false);
+        };
+
+        init();
+    }, [checkAccountStatus, initializeWebSocket, updateBalances, isAuthorized]);
 
     // Show loading state
     if (isLoading) {
@@ -550,7 +561,59 @@ const TradeReplication = observer(() => {
                         </div>
                     ) : (
                         <>
-                            {/* Add your main content here */}
+                            <div className="account-balances-container">
+                                <div className="account-balance-box demo">
+                                    <h3>Demo Account ({demoAccount?.loginid})</h3>
+                                    <div className="balance-amount">{demoAccount?.currency} {formatNumber(demoBalance)}</div>
+                                    <div className={`profit-loss ${demoProfit >= 0 ? 'profit' : 'loss'}`}>
+                                        {demoProfit >= 0 ? '+' : ''}{formatNumber(demoProfit)} {demoAccount?.currency}
+                                    </div>
+                                </div>
+                                
+                                <div className="replication-arrow">
+                                    <span className={`arrow ${isReplicationEnabled ? 'active' : ''}`}>➜</span>
+                                </div>
+                                
+                                <div className="account-balance-box real">
+                                    <h3>Real Account ({realAccount?.loginid})</h3>
+                                    <div className="balance-amount">{realAccount?.currency} {formatNumber(realBalance)}</div>
+                                    <div className={`profit-loss ${realProfit >= 0 ? 'profit' : 'loss'}`}>
+                                        {realProfit >= 0 ? '+' : ''}{formatNumber(realProfit)} {realAccount?.currency}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {activeTrades.length > 0 && (
+                                <div className="active-trades-container">
+                                    <h3>Active Replicated Trades</h3>
+                                    <table className="trades-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Type</th>
+                                                <th>Amount</th>
+                                                <th>Demo P/L</th>
+                                                <th>Real P/L</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {activeTrades.map(trade => (
+                                                <tr key={trade.realTradeId}>
+                                                    <td>{new Date(trade.timestamp).toLocaleTimeString()}</td>
+                                                    <td>{trade.type}</td>
+                                                    <td>{formatNumber(trade.amount)} {realAccount?.currency}</td>
+                                                    <td className={trade.demoProfit >= 0 ? 'profit' : 'loss'}>
+                                                        {trade.demoProfit >= 0 ? '+' : ''}{formatNumber(trade.demoProfit)}
+                                                    </td>
+                                                    <td className={trade.realProfit >= 0 ? 'profit' : 'loss'}>
+                                                        {trade.realProfit >= 0 ? '+' : ''}{formatNumber(trade.realProfit)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </>
                     )}
                 </>
