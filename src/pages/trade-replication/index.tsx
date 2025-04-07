@@ -187,7 +187,6 @@ const TradeReplication = observer(() => {
     const [hasRealAccount, setHasRealAccount] = useState(false);
     const [demoAccount, setDemoAccount] = useState<TAccount | null>(null);
     const [realAccount, setRealAccount] = useState<TAccount | null>(null);
-    const [] = useState<TAccount[]>([]);
     const [replicationHistory, setReplicationHistory] = useState<ReplicationHistoryItem[]>([]);
     const [ws, setWs] = useState<any>(null);
     const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
@@ -219,52 +218,85 @@ const TradeReplication = observer(() => {
     // Refs for API calls and intervals
     const tradeMonitoringInterval = useRef<NodeJS.Timeout | null>(null);
 
-    // Check if user is logged in and has proper accounts
-    const checkAccountStatus = useCallback(async () => {
+    // Check if user is logged in
+    const checkLoginStatus = useCallback(async () => {
         try {
             if (!client?.is_logged_in) {
                 setError('Not logged in');
                 return;
             }
 
-            // Use accountList from client store
-            const accounts = client.accountList;
-            if (!accounts?.length) {
-                setError('No accounts found');
+            if (!api_base.api) {
+                console.error('API not initialized');
+                return;
+            }
+            
+            const response = await api_base.api.authorize();
+            if (response?.error) {
+                console.error('Authorization failed:', response.error);
+                setError('Authorization failed');
+                return;
+            }
+            
+            // Check for both demo and real accounts
+            const accounts = await api_base.api.getAccountList();
+            if (accounts?.error) {
+                console.error('Failed to get account list:', accounts.error);
+                setError('Failed to get account list');
                 return;
             }
 
-            // Check for demo account
-            const demoAccount = accounts.find((acc: TAccount) => acc.is_virtual);
+            const demoAccount = accounts.accounts.find((account: TAccount) => account.is_virtual);
+            const realAccount = accounts.accounts.find((account: TAccount) => !account.is_virtual);
+
             setHasVirtualAccount(!!demoAccount);
-
-            // Check for real account
-            const realAccount = accounts.find((acc: TAccount) => !acc.is_virtual);
             setHasRealAccount(!!realAccount);
-
-            // Set account tokens
-            if (demoAccount) {
-                setDemoAccount({
-                    loginid: demoAccount.loginid,
-                    currency: demoAccount.currency,
-                    balance: demoAccount.balance,
-                    is_virtual: demoAccount.is_virtual,
-                    token: demoAccount.token
-                });
-            }
-            if (realAccount) {
-                setRealAccount({
-                    loginid: realAccount.loginid,
-                    currency: realAccount.currency,
-                    balance: realAccount.balance,
-                    is_virtual: realAccount.is_virtual,
-                    token: realAccount.token
-                });
-            }
         } catch (error) {
-            setError('Failed to check account status');
+            console.error('Failed to check login status:', error);
+            setError('Failed to check login status');
         }
-    }, [client]);
+    }, [client?.is_logged_in]);
+
+    // Check login status on component mount and when client login state changes
+    useEffect(() => {
+        checkLoginStatus();
+    }, [checkLoginStatus, client?.is_logged_in]);
+
+    // Handle toggle change
+    const handleToggleChange = (checked: boolean) => {
+        if (!isAuthorized) {
+            setError('You need to be logged in to use this feature.');
+            return;
+        }
+        
+        if (checked && (!hasVirtualAccount || !hasRealAccount)) {
+            setError('You need both a Demo account and a Real account to use Trade Replication.');
+            return;
+        }
+        
+        setIsReplicationEnabled(checked);
+        
+        if (!checked) {
+            console.log('Trade replication disabled. Existing trades remain active.');
+        } else {
+            console.log('Trade replication enabled. Starting trade monitoring...');
+        }
+    };
+
+    // Initialize component
+    useEffect(() => {
+        const init = async () => {
+            setIsLoading(true);
+            await checkLoginStatus();
+            if (isAuthorized) {
+                await initializeWebSocket();
+                await updateBalances();
+            }
+            setIsLoading(false);
+        };
+
+        init();
+    }, [checkLoginStatus, initializeWebSocket, updateBalances, isAuthorized]);
 
     // Initialize WebSocket connection
     const initializeWebSocket = useCallback(async () => {
@@ -545,105 +577,6 @@ const TradeReplication = observer(() => {
         return num.toFixed(2);
     };
 
-    // Check if user is logged in
-    const checkLoginStatus = useCallback(async () => {
-        try {
-            if (!api_base.api) return;
-            
-            const response = await api_base.api.authorize();
-            if (response?.error) {
-                setError('Authorization failed');
-                return;
-            }
-            
-            // Check for both demo and real accounts
-            const accounts = await api_base.api.getAccountList();
-            if (accounts?.error) {
-                setError('Failed to get account list');
-                return;
-            }
-
-            const demoAccount = accounts.accounts.find((account: TAccount) => account.is_virtual);
-            const realAccount = accounts.accounts.find((account: TAccount) => !account.is_virtual);
-
-            setHasVirtualAccount(!!demoAccount);
-            setHasRealAccount(!!realAccount);
-        } catch (error) {
-            setError('Failed to check login status');
-        }
-    }, []);
-
-    // Check login status on component mount
-    useEffect(() => {
-        checkLoginStatus();
-    }, [checkLoginStatus]);
-
-    // Handle toggle change
-    const handleToggleChange = (checked: boolean) => {
-        if (!isAuthorized) {
-            setError('You need to be logged in to use this feature.');
-            return;
-        }
-        
-        if (checked && (!hasVirtualAccount || !hasRealAccount)) {
-            setError('You need both a Demo account and a Real account to use Trade Replication.');
-            return;
-        }
-        
-        setIsReplicationEnabled(checked);
-        
-        if (!checked) {
-            console.log('Trade replication disabled. Existing trades remain active.');
-        } else {
-            console.log('Trade replication enabled. Starting trade monitoring...');
-        }
-    };
-
-    // Initialize component
-    useEffect(() => {
-        const init = async () => {
-            setIsLoading(true);
-            await checkAccountStatus();
-            if (isAuthorized) {
-                await initializeWebSocket();
-                await updateBalances();
-            }
-            setIsLoading(false);
-        };
-
-        init();
-    }, [checkAccountStatus, initializeWebSocket, updateBalances, isAuthorized]);
-
-    // Fetch account data in real-time
-    useEffect(() => {
-        const fetchAccountData = async () => {
-            try {
-                if (!client?.is_logged_in) return;
-
-                const accounts = client.accountList;
-                const demo = accounts.find(acc => acc.is_virtual);
-                const real = accounts.find(acc => !acc.is_virtual);
-
-                if (demo) {
-                    const demoBalance = await api_base.api?.balance({ loginid: demo.loginid });
-                    setDemoAccount(prev => prev ? { ...prev, balance: demoBalance.balance } : null);
-                }
-
-                if (real) {
-                    const realBalance = await api_base.api?.balance({ loginid: real.loginid });
-                    setRealAccount(prev => prev ? { ...prev, balance: realBalance.balance } : null);
-                }
-            } catch (error) {
-                console.error('Error fetching account data:', error);
-            }
-        };
-
-        const interval = setInterval(fetchAccountData, 5000);
-        fetchAccountData();
-
-        return () => clearInterval(interval);
-    }, [client]);
-
     // Enhanced balance check with proper scaling
     const calculateMaxAllowedAmount = (trade: Trade, realBalance: number): number => {
         const assetRisk = 0.05; // 5% margin requirement
@@ -808,27 +741,6 @@ const TradeReplication = observer(() => {
         setConfirmationTrade(null);
     };
 
-    // Handle login
-    const handleLogin = async () => {
-        if (!isOAuth2Enabled) {
-            window.location.replace(generateOAuthURL());
-        } else {
-            const getQueryParams = new URLSearchParams(window.location.search);
-            const currency = getQueryParams.get('account') ?? '';
-            const query_param_currency = sessionStorage.getItem('query_param_currency') || currency || 'USD';
-            await requestOidcAuthentication({
-                redirectCallbackUri: `${window.location.origin}/callback`,
-                ...(query_param_currency
-                    ? {
-                          state: {
-                              account: query_param_currency,
-                          },
-                      }
-                    : {}),
-            });
-        }
-    };
-
     // Show loading state
     if (isLoading) {
         return (
@@ -848,7 +760,7 @@ const TradeReplication = observer(() => {
                     <div className="loading-state">
                         <p>Loading account information...</p>
                     </div>
-                ) : isAuthorized ? (
+                ) : client?.is_logged_in ? (
                     <div className="account-section">
                         <ToggleSwitch
                             isEnabled={isReplicationEnabled}
@@ -871,27 +783,11 @@ const TradeReplication = observer(() => {
                 ) : (
                     <div className="not-logged-in-message">
                         <p>You need to log in to use the Trade Replication feature.</p>
-                        <div className="auth-actions">
-                            <Button
-                             
-                                onClick={handleLogin}
-                            >
-                                <Localize i18n_default_text='Log in' />
-                            </Button>
-                            <Button
-                        
-                                onClick={() => {
-                                    window.open('https://track.deriv.com/_NwZ3I9wtMv4KqFKZ7JdnQ2Nd7ZgqdRLk/1/');
-                                }}
-                            >
-                                <Localize i18n_default_text='Sign up' />
-                            </Button>
-                        </div>
                     </div>
                 )}
             </div>
             
-            {isAuthorized && (
+            {client?.is_logged_in && (
                 <div className="trade-replication-content">
                     <div className="account-info">
                         <div className="account-balance">
