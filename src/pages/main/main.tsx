@@ -29,14 +29,14 @@ import RunStrategy from '../dashboard/run-strategy';
 import FreeBots from '../free-bots';
 import ToolsHub from '../tools-hub';
 import DigitCircles from '../analysis-tool';
-import TradeReplication from '../trade-replication';
+import { TradeReplication } from '../trade-replication/components/trade-replication';
 
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
-    const { dashboard, load_modal, run_panel, quick_strategy, summary_card } = useStore();
+    const { dashboard, load_modal, run_panel, quick_strategy, summary_card, client } = useStore();
     const {
         active_tab,
         active_tour,
@@ -234,7 +234,11 @@ const AppWrapper = observer(() => {
                             <Suspense
                                 fallback={<ChunkLoader message={localize('Please wait, loading Trade Replication...')} />}
                             >
-                                <TradeReplication />
+                                <TradeReplication 
+                                    demoBalance={parseFloat(client?.balance || '0')} 
+                                    realBalance={parseFloat(client?.balance || '0')} 
+                                    onReplicationChange={(isEnabled) => console.log('Replication enabled:', isEnabled)} 
+                                />
                             </Suspense>
                         </div>
                         <div
