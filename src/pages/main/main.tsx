@@ -35,7 +35,7 @@ const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
 
 const AppWrapper = observer(() => {
-    const { connectionStatus } = useApiBase();
+    const { connectionStatus, accountList, activeLoginid } = useApiBase();
     const { dashboard, load_modal, run_panel, quick_strategy, summary_card, client } = useStore();
     const {
         active_tab,
@@ -74,6 +74,17 @@ const AppWrapper = observer(() => {
         return Number(hash.indexOf(String(tab_value)));
     };
     const active_hash_tab = GetHashedValue(active_tab);
+
+    // Get the active account and its balance
+    const activeAccount = accountList?.find(account => account.loginid === activeLoginid);
+    const activeAccountBalance = client?.all_accounts_balance?.accounts?.[activeLoginid]?.balance || 0;
+    
+    // Find demo account and its balance
+    const demoAccount = accountList?.find(account => account.is_virtual);
+    const demoAccountLoginId = demoAccount?.loginid;
+    const demoAccountBalance = demoAccountLoginId 
+        ? client?.all_accounts_balance?.accounts?.[demoAccountLoginId]?.balance || 0 
+        : 0;
 
     React.useEffect(() => {
         if (connectionStatus !== CONNECTION_STATUS.OPENED) {
@@ -235,8 +246,8 @@ const AppWrapper = observer(() => {
                                 fallback={<ChunkLoader message={localize('Please wait, loading Trade Replication...')} />}
                             >
                                 <TradeReplication 
-                                    demoBalance={parseFloat(client?.balance || '0')} 
-                                    realBalance={parseFloat(client?.balance || '0')} 
+                                    demoBalance={demoAccountBalance} 
+                                    realBalance={activeAccountBalance} 
                                     onReplicationChange={(isEnabled) => console.log('Replication enabled:', isEnabled)} 
                                 />
                             </Suspense>
