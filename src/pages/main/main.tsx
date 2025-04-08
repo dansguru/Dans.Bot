@@ -87,6 +87,13 @@ const AppWrapper = observer(() => {
         ? client?.all_accounts_balance?.accounts?.[demoAccountLoginId]?.balance || 0 
         : 0;
 
+    // Find real account and its balance
+    const realAccount = accountList?.find(account => !account.is_virtual);
+    const realAccountLoginId = realAccount?.loginid;
+    const realAccountBalance = realAccountLoginId 
+        ? client?.all_accounts_balance?.accounts?.[realAccountLoginId]?.balance || 0 
+        : 0;
+
     React.useEffect(() => {
         if (connectionStatus !== CONNECTION_STATUS.OPENED) {
             const is_bot_running = document.getElementById('db-animation__stop-button') !== null;
@@ -248,7 +255,7 @@ const AppWrapper = observer(() => {
                             >
                                 <TradeReplication 
                                     demoBalance={demoAccountBalance} 
-                                    realBalance={activeAccountBalance} 
+                                    realBalance={realAccountBalance} 
                                     isActiveAccountDemo={isActiveAccountDemo}
                                     onReplicationChange={(isEnabled) => console.log('Replication enabled:', isEnabled)} 
                                 />
