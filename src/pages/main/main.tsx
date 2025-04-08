@@ -78,6 +78,7 @@ const AppWrapper = observer(() => {
     // Get the active account and its balance
     const activeAccount = accountList?.find(account => account.loginid === activeLoginid);
     const activeAccountBalance = client?.all_accounts_balance?.accounts?.[activeLoginid]?.balance || 0;
+    const isActiveAccountDemo = activeAccount?.is_virtual || false;
     
     // Find demo account and its balance
     const demoAccount = accountList?.find(account => account.is_virtual);
@@ -248,6 +249,7 @@ const AppWrapper = observer(() => {
                                 <TradeReplication 
                                     demoBalance={demoAccountBalance} 
                                     realBalance={activeAccountBalance} 
+                                    isActiveAccountDemo={isActiveAccountDemo}
                                     onReplicationChange={(isEnabled) => console.log('Replication enabled:', isEnabled)} 
                                 />
                             </Suspense>

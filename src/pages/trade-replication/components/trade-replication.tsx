@@ -6,12 +6,14 @@ import './trade-replication.scss';
 interface TradeReplicationProps {
   demoBalance: number;
   realBalance: number;
+  isActiveAccountDemo: boolean;
   onReplicationChange: (isEnabled: boolean) => void;
 }
 
 export const TradeReplication: React.FC<TradeReplicationProps> = ({
   demoBalance,
   realBalance,
+  isActiveAccountDemo,
   onReplicationChange,
 }) => {
   const [isReplicationEnabled, setIsReplicationEnabled] = useState(false);
@@ -22,6 +24,12 @@ export const TradeReplication: React.FC<TradeReplicationProps> = ({
   const [minBalanceThreshold, setMinBalanceThreshold] = useState(50);
   const [askBeforeExecuting, setAskBeforeExecuting] = useState(false);
   const [maxTradeSize, setMaxTradeSize] = useState(200);
+  const [activeAccountType, setActiveAccountType] = useState<'demo' | 'real'>(isActiveAccountDemo ? 'demo' : 'real');
+
+  // Update active account type when isActiveAccountDemo changes
+  useEffect(() => {
+    setActiveAccountType(isActiveAccountDemo ? 'demo' : 'real');
+  }, [isActiveAccountDemo]);
 
   const handleReplicationToggle = (value: boolean) => {
     if (value) {
@@ -63,13 +71,15 @@ export const TradeReplication: React.FC<TradeReplicationProps> = ({
         <div className="header-left">
           <h2>Trade Replication</h2>
           <div className="balance-display">
-            <div className="balance-item">
+            <div className={`balance-item ${activeAccountType === 'demo' ? 'active-account' : ''}`}>
               <span className="balance-label">Demo Balance:</span>
               <span className="balance-value">${demoBalance.toFixed(2)}</span>
+              {activeAccountType === 'demo' && <span className="active-indicator">(Active)</span>}
             </div>
-            <div className="balance-item">
+            <div className={`balance-item ${activeAccountType === 'real' ? 'active-account' : ''}`}>
               <span className="balance-label">Real Balance:</span>
               <span className="balance-value">${realBalance.toFixed(2)}</span>
+              {activeAccountType === 'real' && <span className="active-indicator">(Active)</span>}
             </div>
           </div>
         </div>
