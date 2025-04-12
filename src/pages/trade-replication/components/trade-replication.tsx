@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ToggleSwitch from './toggle-switch';
 import CustomModal from './custom-modal';
 import './trade-replication.scss';
@@ -89,7 +89,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
           processDemoTrade(contract, tradeSize);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          addLog(`Failed to process demo trade: ${errorMessage}`, LogLevel.ERROR);
+          addLog(LogLevel.ERROR, `Failed to process demo trade: ${errorMessage}`);
           showNotification('Failed to process demo trade', 'error');
         }
       });
@@ -107,6 +107,32 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
 
   const processDemoTrade = (contract: any, tradeSize: number) => {
     try {
+      // Calculate available demo balance
+      const availableDemoBalance = demoBalance - demoTrades.reduce((acc, trade) => acc + trade.originalTradeSize, 0);
+
+      // Calculate required margin for all pending trades
+      const totalRequiredMargin = pendingTrades.reduce((acc, trade) => {
+        return acc + calculateRequiredMargin(trade.scaledTradeSize);
+      }, 0);
+
+      // Check if real account has sufficient balance
+      const hasSufficientRealBalance = realBalance >= totalRequiredMargin;
+
+      if (!isReplicationEnabled) {
+        addLog(LogLevel.WARNING, 'Trade replication is disabled');
+        return;
+      }
+
+      if (availableDemoBalance < tradeSize) {
+        addLog(LogLevel.WARNING, 'Insufficient demo balance for trade');
+        return;
+      }
+
+      if (!hasSufficientRealBalance) {
+        addLog(LogLevel.WARNING, 'Insufficient real balance for trade replication');
+        return;
+      }
+
       // Calculate scaled trade size based on settings
       let scaledTradeSize = 0;
       
@@ -141,14 +167,14 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
           requiredMargin,
           timestamp: new Date().toISOString()
         }]);
-        addLog(`Trade added to pending approval: ${contract.underlying} - Demo: $${tradeSize} → Scaled: $${scaledTradeSize}`, LogLevel.INFO);
+        addLog(LogLevel.INFO, `Trade added to pending approval: ${contract.underlying} - Demo: $${tradeSize} → Scaled: $${scaledTradeSize}`);
       } else {
         // Execute trade immediately if no approval required
         executeTrade(contract, scaledTradeSize);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      addLog(`Failed to process demo trade: ${errorMessage}`, LogLevel.ERROR);
+      addLog(LogLevel.ERROR, `Failed to process demo trade: ${errorMessage}`);
       showNotification('Failed to process demo trade', 'error');
     }
   };
@@ -164,7 +190,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
       }
 
       // Execute the trade
-      addLog(`Executing trade: ${contract.underlying} - $${tradeSize}`, LogLevel.INFO);
+      addLog(LogLevel.INFO, `Executing trade: ${contract.underlying} - $${tradeSize}`);
       showNotification(`Executing trade: ${contract.underlying} - $${tradeSize}`, 'info');
       
       // Update real balance after successful trade
@@ -173,22 +199,28 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
       onReplicationChange(true, newBalance);  // Re-enable replication after trade
       setNewRealBalance(newBalance);
       
-      addLog(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, LogLevel.SUCCESS);
+      addLog(LogLevel.SUCCESS, `Trade executed successfully: ${contract.underlying} - $${tradeSize}`);
       showNotification(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, 'success');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      addLog(`Trade execution failed: ${errorMessage}`, LogLevel.ERROR);
+      addLog(LogLevel.ERROR, `Trade execution failed: ${errorMessage}`);
       showNotification('Trade execution failed', 'error');
     }
   };
 
-  const addLog = (message: string, level: LogLevel) => {
+  const addLog = (level: LogLevel, message: string) => {
     const logEntry: LogEntry = {
       timestamp: new Date().toLocaleTimeString(),
       message,
       level,
     };
-    setLogs(prevLogs => [...prevLogs, logEntry]);
+    
+    // Remove oldest log if we have too many
+    if (logs.length >= 100) {
+      setLogs(prevLogs => [...prevLogs.slice(1), logEntry]);
+    } else {
+      setLogs(prevLogs => [...prevLogs, logEntry]);
+    }
   };
 
   const approvePendingTrade = (tradeIndex: number) => {
@@ -204,20 +236,17 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
 
   const handleReplicationToggle = (value: boolean) => {
     if (value) {
-      // Reset demo trades when enabling replication
-      setDemoTrades([]);
-      
-      // Enable replication
-      setIsReplicationEnabled(true);
-      onReplicationChange(true);
-      showNotification('Trade replication enabled - Now copying demo trades to real account', 'success');
-      addLog('Trade replication enabled - Now copying demo trades to real account', LogLevel.SUCCESS);
+      // Only enable if demo account has available funds
+      const availableDemoBalance = demoBalance - demoTrades.reduce((acc, trade) => acc + trade.originalTradeSize, 0);
+      if (availableDemoBalance > 0) {
+        setIsReplicationEnabled(true);
+        onReplicationChange(true);
+      } else {
+        addLog(LogLevel.WARNING, 'Cannot enable replication: No available funds in demo account');
+      }
     } else {
-      // Disable replication
       setIsReplicationEnabled(false);
       onReplicationChange(false);
-      showNotification('Trade replication disabled', 'info');
-      addLog('Trade replication disabled', LogLevel.INFO);
     }
   };
 
@@ -232,13 +261,6 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     return realBalance >= margin;
   };
 
-  const LogEntryComponent = ({ log }: { log: LogEntry }) => (
-    <div className={`log-entry ${log.level}`}>
-      <span className="timestamp">{log.timestamp}</span>
-      <span className="message">{log.message}</span>
-    </div>
-  );
-
   return (
     <div className="trade-replication">
       <div className="container">
@@ -247,16 +269,32 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
             <div className="replication-header">
               <div className="header-left">
                 <h2>Trade Replication</h2>
-                <div className="balance-display">
-                  <div className="balance-item">
-                    <div className="balance-label">Demo Balance</div>
-                    <div className="balance-value">${demoBalance.toFixed(2)}</div>
-                    <div className="active-indicator">Demo Account</div>
+                <div className="account-status">
+                  <div className="account-card demo-account">
+                    <div className="account-icon">
+                      <span className="demo-icon">Demo</span>
+                    </div>
+                    <div className="account-info">
+                      <div className="account-label">Demo Account</div>
+                      <div className="account-balance">${demoBalance.toFixed(2)}</div>
+                    </div>
+                    <div className="account-status-indicator">
+                      <span className="status-dot" style={{ backgroundColor: isActiveAccountDemo ? '#28a745' : '#ced4da' }}></span>
+                      <span className="status-text">{isActiveAccountDemo ? 'Active' : 'Inactive'}</span>
+                    </div>
                   </div>
-                  <div className="balance-item">
-                    <div className="balance-label">Real Balance</div>
-                    <div className="balance-value">${newRealBalance.toFixed(2)}</div>
-                    <div className="active-indicator">Real Account</div>
+                  <div className="account-card real-account">
+                    <div className="account-icon">
+                      <span className="real-icon">Real</span>
+                    </div>
+                    <div className="account-info">
+                      <div className="account-label">Real Account</div>
+                      <div className="account-balance">${realBalance.toFixed(2)}</div>
+                    </div>
+                    <div className="account-status-indicator">
+                      <span className="status-dot" style={{ backgroundColor: !isActiveAccountDemo ? '#28a745' : '#ced4da' }}></span>
+                      <span className="status-text">{!isActiveAccountDemo ? 'Active' : 'Inactive'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -271,123 +309,198 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
             </div>
 
             {isReplicationEnabled && (
-              <div className="replication-settings">
-                <div className="settings-section">
-                  <h3>Trade Scaling</h3>
-                  <div className="input-group">
-                    <label>Scaling Mode</label>
-                    <div className="radio-group">
-                      <label>
-                        <input
-                          type="radio"
-                          checked={scalingMode === 'auto'}
-                          onChange={() => setScalingMode('auto')}
-                        />
-                        Auto Scale (Based on Balance)
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          checked={scalingMode === 'fixed'}
-                          onChange={() => setScalingMode('fixed')}
-                        />
-                        Fixed Risk %
-                      </label>
+              <div className="copy-trading-section">
+                <div className="grid-container">
+                  {/* Account Status Grid */}
+                  <div className="grid-item account-status">
+                    <div className="grid-header">
+                      <h3>Account Status</h3>
+                      <div className="status-indicator">
+                        <span className="status-dot" style={{ backgroundColor: isActiveAccountDemo ? '#28a745' : '#ced4da' }}></span>
+                        <span className="status-text">{isActiveAccountDemo ? 'Demo Active' : 'Real Active'}</span>
+                      </div>
+                    </div>
+                    <div className="account-grid">
+                      <div className="account-cell">
+                        <div className="account-icon demo-icon">Demo</div>
+                        <div className="account-info">
+                          <div className="balance">${demoBalance.toFixed(2)}</div>
+                          <div className="label">Demo Account</div>
+                        </div>
+                      </div>
+                      <div className="account-cell">
+                        <div className="account-icon real-icon">Real</div>
+                        <div className="account-info">
+                          <div className="balance">${realBalance.toFixed(2)}</div>
+                          <div className="label">Real Account</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {scalingMode === 'fixed' && (
-                    <div className="input-group">
-                      <label>Risk Percentage (%)</label>
-                      <input
-                        type="number"
-                        value={riskPercentage}
-                        onChange={(e) => setRiskPercentage(Number(e.target.value))}
-                        min="1"
-                        max="100"
-                      />
+                  {/* Trade Settings Grid */}
+                  <div className="grid-item trade-settings">
+                    <div className="grid-header">
+                      <h3>Trade Settings</h3>
+                      <div className="settings-info">Configure trade replication parameters</div>
                     </div>
-                  )}
-
-                  <div className="input-group">
-                    <label>Maximum Trade Size ($)</label>
-                    <input
-                      type="number"
-                      value={maxTradeSize}
-                      onChange={(e) => setMaxTradeSize(Number(e.target.value))}
-                      min="0"
-                    />
-                  </div>
-                </div>
-
-                <div className="settings-section">
-                  <h3>Margin Requirements</h3>
-                  <div className="input-group">
-                    <label>Asset Risk (%)</label>
-                    <input
-                      type="number"
-                      value={assetRisk}
-                      onChange={(e) => setAssetRisk(Number(e.target.value))}
-                      min="1"
-                      max="100"
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label>Margin Buffer (%)</label>
-                    <input
-                      type="number"
-                      value={marginBuffer}
-                      onChange={(e) => setMarginBuffer(Number(e.target.value))}
-                      min="1"
-                      max="100"
-                    />
-                  </div>
-                  <div className="info-box">
-                    <p>Example: For a $500 trade with 5% risk, required margin = ${calculateRequiredMargin(500).toFixed(2)}</p>
-                  </div>
-                </div>
-
-                <div className="settings-section">
-                  <h3>User Controls</h3>
-                  <div className="input-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={askBeforeExecuting}
-                        onChange={(e) => setAskBeforeExecuting(e.target.checked)}
-                      />
-                      Ask Before Executing (Manual Approval)
-                    </label>
-                  </div>
-                  <div className="pending-trades">
-                    <h4>Pending Trades ({pendingTrades.length})</h4>
-                    <div className="trades-list">
-                      {pendingTrades.map((trade, index) => (
-                        <div key={index} className="trade-item">
-                          <div className="trade-details">
-                            <span>Asset: {trade.underlying}</span>
-                            <span>Trade Size: $${trade.scaledTradeSize.toFixed(2)}</span>
-                            <span>Required Margin: $${trade.requiredMargin.toFixed(2)}</span>
+                    <div className="settings-grid">
+                      <div className="setting-group">
+                        <div className="setting-label">Scaling Mode</div>
+                        <div className="radio-group">
+                          <label className="radio-option">
+                            <input
+                              type="radio"
+                              checked={scalingMode === 'auto'}
+                              onChange={() => setScalingMode('auto')}
+                            />
+                            <span className="radio-label">Auto Scale</span>
+                            <span className="radio-description">Scales based on real account balance</span>
+                          </label>
+                          <label className="radio-option">
+                            <input
+                              type="radio"
+                              checked={scalingMode === 'fixed'}
+                              onChange={() => setScalingMode('fixed')}
+                            />
+                            <span className="radio-label">Fixed Risk %</span>
+                            <span className="radio-description">Sets fixed risk percentage</span>
+                          </label>
+                        </div>
+                        {scalingMode === 'fixed' && (
+                          <div className="setting-input">
+                            <label>Risk Percentage (%)</label>
+                            <input
+                              type="number"
+                              value={riskPercentage}
+                              onChange={(e) => setRiskPercentage(Number(e.target.value))}
+                              min="1"
+                              max="100"
+                            />
                           </div>
-                          <div className="trade-actions">
-                            <button onClick={() => approvePendingTrade(index)}>Approve</button>
-                            <button onClick={() => setPendingTrades(prev => prev.filter((_, i) => i !== index))}>Reject</button>
+                        )}
+                      </div>
+
+                      <div className="setting-group">
+                        <div className="setting-label">Trade Controls</div>
+                        <div className="checkbox-group">
+                          <label className="checkbox-option">
+                            <input
+                              type="checkbox"
+                              checked={askBeforeExecuting}
+                              onChange={(e) => setAskBeforeExecuting(e.target.checked)}
+                            />
+                            <span className="checkbox-label">Ask Before Executing</span>
+                            <span className="checkbox-description">Requires manual approval for each trade</span>
+                          </label>
+                        </div>
+                        <div className="setting-input">
+                          <label>Maximum Trade Size ($)</label>
+                          <input
+                            type="number"
+                            value={maxTradeSize}
+                            onChange={(e) => setMaxTradeSize(Number(e.target.value))}
+                            min="0"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="setting-group">
+                        <div className="setting-label">Margin Requirements</div>
+                        <div className="setting-input">
+                          <label>Asset Risk (%)</label>
+                          <input
+                            type="number"
+                            value={assetRisk}
+                            onChange={(e) => setAssetRisk(Number(e.target.value))}
+                            min="1"
+                            max="100"
+                          />
+                        </div>
+                        <div className="setting-input">
+                          <label>Margin Buffer (%)</label>
+                          <input
+                            type="number"
+                            value={marginBuffer}
+                            onChange={(e) => setMarginBuffer(Number(e.target.value))}
+                            min="1"
+                            max="100"
+                          />
+                        </div>
+                        <div className="margin-example">
+                          <p>Example: For a $500 trade with 5% risk, required margin = ${calculateRequiredMargin(500).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pending Trades Grid */}
+                  <div className="grid-item pending-trades">
+                    <div className="grid-header">
+                      <h3>Pending Trades</h3>
+                      <div className="pending-count">{pendingTrades.length} pending</div>
+                    </div>
+                    <div className="trades-grid">
+                      {pendingTrades.map((trade, index) => (
+                        <div key={index} className="trade-card">
+                          <div className="trade-info">
+                            <div className="trade-icon">📊</div>
+                            <div className="trade-details">
+                              <div className="trade-asset">{trade.underlying}</div>
+                              <div className="trade-size">Trade Size: $${trade.scaledTradeSize.toFixed(2)}</div>
+                              <div className="trade-margin">Required Margin: $${trade.requiredMargin.toFixed(2)}</div>
+                            </div>
+                            <div className="trade-actions">
+                              <button onClick={() => approvePendingTrade(index)} className="approve-btn">
+                                <span className="action-icon">✅</span>
+                                Approve
+                              </button>
+                              <button onClick={() => setPendingTrades(prev => prev.filter((_, i) => i !== index))} className="reject-btn">
+                                <span className="action-icon">❌</span>
+                                Reject
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
 
-            {isReplicationEnabled && (
-              <div className="log-container">
-                <h3>Replication Activity</h3>
-                <div className="logs">
-                  {logs.map((log, index) => (
-                    <LogEntryComponent key={index} log={log} />
-                  ))}
+                  {/* Activity Log Grid */}
+                  <div className="grid-item activity-log">
+                    <div className="grid-header">
+                      <h3>Activity Log</h3>
+                      <div className="log-info">Recent trade replication activity</div>
+                    </div>
+                    <div className="logs-wrapper">
+                      <div className="logs">
+                        {logs.map((log, index) => (
+                          <div key={index} className={`log-bubble ${log.level}`}>
+                            <div className="bubble-content">
+                              <div className="bubble-header">
+                                <span className="bubble-timestamp">{log.timestamp}</span>
+                                <span className="bubble-icon">
+                                  {log.level === LogLevel.INFO && <span>ℹ️</span>}
+                                  {log.level === LogLevel.WARNING && <span>⚠️</span>}
+                                  {log.level === LogLevel.ERROR && <span>❌</span>}
+                                  {log.level === LogLevel.SUCCESS && <span>✅</span>}
+                                </span>
+                              </div>
+                              <div className="bubble-message">
+                                <div className="bubble-title">
+                                  {log.level === LogLevel.INFO && 'Info'}
+                                  {log.level === LogLevel.WARNING && 'Warning'}
+                                  {log.level === LogLevel.ERROR && 'Error'}
+                                  {log.level === LogLevel.SUCCESS && 'Success'}
+                                </div>
+                                <div className="bubble-text">{log.message}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
