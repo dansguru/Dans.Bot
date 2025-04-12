@@ -345,91 +345,62 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                       <div className="settings-info">Configure trade replication parameters</div>
                     </div>
                     <div className="settings-grid">
-                      <div className="setting-group">
-                        <div className="setting-label">Scaling Mode</div>
-                        <div className="radio-group">
-                          <label className="radio-option">
-                            <input
-                              type="radio"
-                              checked={scalingMode === 'auto'}
-                              onChange={() => setScalingMode('auto')}
-                            />
-                            <span className="radio-label">Auto Scale</span>
-                            <span className="radio-description">Scales based on real account balance</span>
-                          </label>
-                          <label className="radio-option">
-                            <input
-                              type="radio"
-                              checked={scalingMode === 'fixed'}
-                              onChange={() => setScalingMode('fixed')}
-                            />
-                            <span className="radio-label">Fixed Risk %</span>
-                            <span className="radio-description">Sets fixed risk percentage</span>
-                          </label>
-                        </div>
-                        {scalingMode === 'fixed' && (
-                          <div className="setting-input">
-                            <label>Risk Percentage (%)</label>
-                            <input
-                              type="number"
-                              value={riskPercentage}
-                              onChange={(e) => setRiskPercentage(Number(e.target.value))}
-                              min="1"
-                              max="100"
-                            />
+                      <div className="settings-section">
+                        <h3>Configure trade replication parameters</h3>
+                        <div className="settings-group">
+                          <div className="scaling-mode">
+                            <h4>Scaling Mode</h4>
+                            <div className="radio-group">
+                              <label>
+                                <input type="radio" name="scaling" checked={scalingMode === 'auto'} onChange={() => setScalingMode('auto')} />
+                                Auto Scale
+                              </label>
+                              <label>
+                                <input type="radio" name="scaling" checked={scalingMode === 'fixed'} onChange={() => setScalingMode('fixed')} />
+                                Fixed Risk %
+                              </label>
+                            </div>
                           </div>
-                        )}
-                      </div>
-
-                      <div className="setting-group">
-                        <div className="setting-label">Trade Controls</div>
-                        <div className="checkbox-group">
-                          <label className="checkbox-option">
-                            <input
-                              type="checkbox"
-                              checked={askBeforeExecuting}
-                              onChange={(e) => setAskBeforeExecuting(e.target.checked)}
-                            />
-                            <span className="checkbox-label">Ask Before Executing</span>
-                            <span className="checkbox-description">Requires manual approval for each trade</span>
-                          </label>
-                        </div>
-                        <div className="setting-input">
-                          <label>Maximum Trade Size ($)</label>
-                          <input
-                            type="number"
-                            value={maxTradeSize}
-                            onChange={(e) => setMaxTradeSize(Number(e.target.value))}
-                            min="0"
-                          />
                         </div>
                       </div>
 
-                      <div className="setting-group">
-                        <div className="setting-label">Margin Requirements</div>
-                        <div className="setting-input">
-                          <label>Asset Risk (%)</label>
-                          <input
-                            type="number"
-                            value={assetRisk}
-                            onChange={(e) => setAssetRisk(Number(e.target.value))}
-                            min="1"
-                            max="100"
-                          />
+                      <div className="settings-section">
+                        <h4>Trade Controls</h4>
+                        <div className="control-group">
+                          <div className="control-item">
+                            <label>
+                              <input type="checkbox" checked={askBeforeExecuting} onChange={() => setAskBeforeExecuting(!askBeforeExecuting)} />
+                              Ask Before Executing
+                            </label>
+                            <p>Requires manual approval for each trade</p>
+                          </div>
+                          <div className="control-item">
+                            <label>Maximum Trade Size ($)</label>
+                            <input type="number" value={maxTradeSize} onChange={(e) => setMaxTradeSize(Number(e.target.value))} min="1" max="1000" />
+                          </div>
                         </div>
-                        <div className="setting-input">
-                          <label>Margin Buffer (%)</label>
-                          <input
-                            type="number"
-                            value={marginBuffer}
-                            onChange={(e) => setMarginBuffer(Number(e.target.value))}
-                            min="1"
-                            max="100"
-                          />
+                      </div>
+
+                      <div className="settings-section">
+                        <h4>Margin Requirements</h4>
+                        <div className="control-group">
+                          <div className="control-item">
+                            <label>Asset Risk (%)</label>
+                            <input type="number" value={assetRisk} onChange={(e) => setAssetRisk(Number(e.target.value))} min="1" max="100" />
+                          </div>
+                          <div className="control-item">
+                            <label>Margin Buffer (%)</label>
+                            <input type="number" value={marginBuffer} onChange={(e) => setMarginBuffer(Number(e.target.value))} min="1" max="100" />
+                          </div>
+                          <div className="example-calculation">
+                            <p>Example: For a $500 trade with {assetRisk}% risk, required margin = ${calculateRequiredMargin(500).toFixed(2)}</p>
+                          </div>
                         </div>
-                        <div className="margin-example">
-                          <p>Example: For a $500 trade with 5% risk, required margin = ${calculateRequiredMargin(500).toFixed(2)}</p>
-                        </div>
+                      </div>
+
+                      <div className="pending-trades-section">
+                        <h4>Pending Trades</h4>
+                        <div className="pending-count">{pendingTrades.length} pending</div>
                       </div>
                     </div>
                   </div>
