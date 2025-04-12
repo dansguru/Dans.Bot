@@ -54,6 +54,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
   const [pendingTrades, setPendingTrades] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [demoTrades, setDemoTrades] = useState<any[]>([]);
   const [newRealBalance, setNewRealBalance] = useState(realBalance);
 
   const MIN_TRADE_SIZE = 1; // Minimum trade size in dollars
@@ -77,59 +78,24 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
           // Get trade size from contract
           const tradeSize = contract.trade_size || contract.stake;
           
-          // Calculate scaled trade size
-          const scaledTradeSize = calculateScaledTrade(tradeSize);
-          
-          // Check if we have enough margin
-          const requiredMargin = calculateRequiredMargin(scaledTradeSize);
-          if (realBalance < requiredMargin) {
-            addLog(`Insufficient margin: Required $${requiredMargin}, Available $${realBalance}`, LogLevel.ERROR);
-            showNotification('Insufficient margin for trade', 'error');
-            return;
-          }
+          // Store demo trade
+          setDemoTrades(prev => [...prev, {
+            ...contract,
+            originalTradeSize: tradeSize,
+            timestamp: new Date().toISOString()
+          }]);
 
-          // Add to pending trades if manual approval is required
-          if (askBeforeExecuting) {
-            setPendingTrades(prev => [...prev, {
-              ...contract,
-              demoTradeSize: tradeSize,
-              scaledTradeSize,
-              requiredMargin
-            }]);
-            addLog(`Trade added to pending approval: ${contract.underlying} - $${scaledTradeSize}`, LogLevel.INFO);
-          } else {
-            // Execute trade immediately if no approval required
-            executeTrade(contract, scaledTradeSize);
-          }
+          // Process trade for real account
+          processDemoTrade(contract, tradeSize);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          addLog(`Failed to process trade: ${errorMessage}`, LogLevel.ERROR);
-          showNotification('Trade processing failed', 'error');
+          addLog(`Failed to process demo trade: ${errorMessage}`, LogLevel.ERROR);
+          showNotification('Failed to process demo trade', 'error');
         }
       });
       
       if (typeof unsubscribeBotContract === 'function') {
         unsubscribeFunctions.push(unsubscribeBotContract);
-      }
-      
-      const unsubscribeBotRunning = globalObserver.register('bot.running', () => {
-        if (!isReplicationEnabled) return;
-        showNotification('Bot started - Trade replication is active', 'info');
-        addLog('Bot started - Trade replication is active', LogLevel.INFO);
-      });
-      
-      if (typeof unsubscribeBotRunning === 'function') {
-        unsubscribeFunctions.push(unsubscribeBotRunning);
-      }
-      
-      const unsubscribeBotStop = globalObserver.register('bot.stop', () => {
-        if (!isReplicationEnabled) return;
-        showNotification('Bot stopped - Trade replication paused', 'info');
-        addLog('Bot stopped - Trade replication paused', LogLevel.INFO);
-      });
-      
-      if (typeof unsubscribeBotStop === 'function') {
-        unsubscribeFunctions.push(unsubscribeBotStop);
       }
 
       return () => {
@@ -139,27 +105,51 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     }
   }, [isReplicationEnabled, realBalance, askBeforeExecuting]);
 
-  const addLog = (message: string, level: LogLevel) => {
-    const logEntry: LogEntry = {
-      timestamp: new Date().toLocaleTimeString(),
-      message,
-      level,
-    };
-    setLogs(prevLogs => [...prevLogs, logEntry]);
-  };
+  const processDemoTrade = (contract: any, tradeSize: number) => {
+    try {
+      // Calculate scaled trade size based on settings
+      let scaledTradeSize = 0;
+      
+      if (scalingMode === 'auto') {
+        // Auto scaling based on real account balance
+        const effectiveDemoSize = Math.max(tradeSize, MIN_TRADE_SIZE);
+        const maxPossibleTrade = realBalance / ((assetRisk / 100) + (marginBuffer / effectiveDemoSize));
+        const scalingFactor = Math.min(1, maxPossibleTrade / effectiveDemoSize);
+        scaledTradeSize = Math.max(effectiveDemoSize * scalingFactor, MIN_TRADE_SIZE);
+      } else {
+        // Fixed percentage risk scaling
+        scaledTradeSize = (realBalance * riskPercentage) / 100;
+      }
 
-  const handleReplicationToggle = (value: boolean) => {
-    if (value) {
-      // No need for API calls, just enable/disable locally
-      setIsReplicationEnabled(true);
-      onReplicationChange(true);
-      showNotification('Trade replication has been enabled', 'success');
-      addLog('Trade replication successfully enabled', LogLevel.SUCCESS);
-    } else {
-      setIsReplicationEnabled(false);
-      onReplicationChange(false);
-      showNotification('Trade replication has been disabled', 'info');
-      addLog('Trade replication successfully disabled', LogLevel.INFO);
+      // Check if scaled trade size exceeds max trade size
+      scaledTradeSize = Math.min(scaledTradeSize, maxTradeSize);
+
+      // Calculate required margin
+      const requiredMargin = calculateRequiredMargin(scaledTradeSize);
+      
+      // Check if we have enough balance
+      if (realBalance < requiredMargin) {
+        throw new Error(`Insufficient balance. Required margin: $${requiredMargin}, Available: $${realBalance}`);
+      }
+
+      // Add to pending trades if manual approval is required
+      if (askBeforeExecuting) {
+        setPendingTrades(prev => [...prev, {
+          ...contract,
+          demoTradeSize: tradeSize,
+          scaledTradeSize,
+          requiredMargin,
+          timestamp: new Date().toISOString()
+        }]);
+        addLog(`Trade added to pending approval: ${contract.underlying} - Demo: $${tradeSize} → Scaled: $${scaledTradeSize}`, LogLevel.INFO);
+      } else {
+        // Execute trade immediately if no approval required
+        executeTrade(contract, scaledTradeSize);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addLog(`Failed to process demo trade: ${errorMessage}`, LogLevel.ERROR);
+      showNotification('Failed to process demo trade', 'error');
     }
   };
 
@@ -181,6 +171,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
       const newBalance = realBalance - tradeSize;
       onReplicationChange(false); // Temporarily disable replication during trade
       onReplicationChange(true, newBalance);  // Re-enable replication after trade
+      setNewRealBalance(newBalance);
       
       addLog(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, LogLevel.SUCCESS);
       showNotification(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, 'success');
@@ -188,6 +179,45 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addLog(`Trade execution failed: ${errorMessage}`, LogLevel.ERROR);
       showNotification('Trade execution failed', 'error');
+    }
+  };
+
+  const addLog = (message: string, level: LogLevel) => {
+    const logEntry: LogEntry = {
+      timestamp: new Date().toLocaleTimeString(),
+      message,
+      level,
+    };
+    setLogs(prevLogs => [...prevLogs, logEntry]);
+  };
+
+  const approvePendingTrade = (tradeIndex: number) => {
+    const trade = pendingTrades[tradeIndex];
+    if (trade) {
+      // Execute the trade with the scaled size
+      executeTrade(trade, trade.scaledTradeSize);
+      
+      // Remove the approved trade from pending list
+      setPendingTrades(prev => prev.filter((_, index) => index !== tradeIndex));
+    }
+  };
+
+  const handleReplicationToggle = (value: boolean) => {
+    if (value) {
+      // Reset demo trades when enabling replication
+      setDemoTrades([]);
+      
+      // Enable replication
+      setIsReplicationEnabled(true);
+      onReplicationChange(true);
+      showNotification('Trade replication enabled - Now copying demo trades to real account', 'success');
+      addLog('Trade replication enabled - Now copying demo trades to real account', LogLevel.SUCCESS);
+    } else {
+      // Disable replication
+      setIsReplicationEnabled(false);
+      onReplicationChange(false);
+      showNotification('Trade replication disabled', 'info');
+      addLog('Trade replication disabled', LogLevel.INFO);
     }
   };
 
@@ -202,58 +232,12 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     return realBalance >= margin;
   };
 
-  const calculateScaledTrade = (demoTradeSize: number) => {
-    // Ensure minimum trade size is respected
-    const effectiveDemoSize = Math.max(demoTradeSize, MIN_TRADE_SIZE);
-    
-    // Calculate scaling factor based on real account balance
-    const maxPossibleTrade = realBalance / ((assetRisk / 100) + (marginBuffer / effectiveDemoSize));
-    const scalingFactor = Math.min(1, maxPossibleTrade / effectiveDemoSize);
-    
-    // Apply scaling while ensuring minimum trade size
-    const scaledSize = Math.max(effectiveDemoSize * scalingFactor, MIN_TRADE_SIZE);
-    
-    return scaledSize;
-  };
-
-  const onBotRunningEvent = () => {
-    if (!isReplicationEnabled) return;
-    showNotification('Bot started - Trade replication is active', 'info');
-  };
-
-  const onBotStopEvent = () => {
-    if (!isReplicationEnabled) return;
-    setPendingTrades([]);
-    showNotification('Bot stopped - Trade replication paused', 'info');
-  };
-
   const LogEntryComponent = ({ log }: { log: LogEntry }) => (
     <div className={`log-entry ${log.level}`}>
       <span className="timestamp">{log.timestamp}</span>
       <span className="message">{log.message}</span>
     </div>
   );
-
-  const approvePendingTrade = (tradeIndex: number) => {
-    const trade = pendingTrades[tradeIndex];
-    if (trade) {
-      // Execute the trade with the scaled size
-      executeTrade(trade, trade.scaledTradeSize);
-      
-      // Remove the approved trade from pending list
-      setPendingTrades(prev => prev.filter((_, index) => index !== tradeIndex));
-    }
-  };
-
- 
-  // Check if replication should be stopped based on minimum balance threshold
-  useEffect(() => {
-    if (isReplicationEnabled && realBalance < minBalanceThreshold) {
-      setIsReplicationEnabled(false);
-      onReplicationChange(false);
-      showNotification(`Trade replication stopped: Balance below minimum threshold ($${minBalanceThreshold})`, 'error');
-    }
-  }, [realBalance, minBalanceThreshold, isReplicationEnabled, onReplicationChange]);
 
   return (
     <div className="trade-replication">
@@ -280,7 +264,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                 <ToggleSwitch
                   isEnabled={isReplicationEnabled}
                   onToggle={handleReplicationToggle}
-                  label="Enable Replication"
+                  label="Enable Trade Replication"
                   disabled={isProcessing}
                 />
               </div>
@@ -289,7 +273,55 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
             {isReplicationEnabled && (
               <div className="replication-settings">
                 <div className="settings-section">
-                  <h3>Liquidation Shield</h3>
+                  <h3>Trade Scaling</h3>
+                  <div className="input-group">
+                    <label>Scaling Mode</label>
+                    <div className="radio-group">
+                      <label>
+                        <input
+                          type="radio"
+                          checked={scalingMode === 'auto'}
+                          onChange={() => setScalingMode('auto')}
+                        />
+                        Auto Scale (Based on Balance)
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          checked={scalingMode === 'fixed'}
+                          onChange={() => setScalingMode('fixed')}
+                        />
+                        Fixed Risk %
+                      </label>
+                    </div>
+                  </div>
+
+                  {scalingMode === 'fixed' && (
+                    <div className="input-group">
+                      <label>Risk Percentage (%)</label>
+                      <input
+                        type="number"
+                        value={riskPercentage}
+                        onChange={(e) => setRiskPercentage(Number(e.target.value))}
+                        min="1"
+                        max="100"
+                      />
+                    </div>
+                  )}
+
+                  <div className="input-group">
+                    <label>Maximum Trade Size ($)</label>
+                    <input
+                      type="number"
+                      value={maxTradeSize}
+                      onChange={(e) => setMaxTradeSize(Number(e.target.value))}
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <h3>Margin Requirements</h3>
                   <div className="input-group">
                     <label>Asset Risk (%)</label>
                     <input
@@ -316,49 +348,6 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                 </div>
 
                 <div className="settings-section">
-                  <h3>Dynamic Scaling</h3>
-                  <div className="input-group">
-                    <label>Scaling Mode</label>
-                    <div className="radio-group">
-                      <label>
-                        <input
-                          type="radio"
-                          checked={scalingMode === 'auto'}
-                          onChange={() => setScalingMode('auto')}
-                        />
-                        Auto-Scale
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          checked={scalingMode === 'fixed'}
-                          onChange={() => setScalingMode('fixed')}
-                        />
-                        Fixed % Risk
-                      </label>
-                    </div>
-                  </div>
-                  {scalingMode === 'fixed' && (
-                    <div className="input-group">
-                      <label>Risk Percentage (%)</label>
-                      <input
-                        type="number"
-                        value={riskPercentage}
-                        onChange={(e) => setRiskPercentage(Number(e.target.value))}
-                        min="1"
-                        max="100"
-                      />
-                    </div>
-                  )}
-                  <div className="info-box">
-                    <p>{scalingMode === 'auto' ? 
-                      'All trades will be scaled down to match your real account balance if needed.' : 
-                      `All trades will be capped at ${riskPercentage}% of your real account balance.`
-                    }</p>
-                  </div>
-                </div>
-
-                <div className="settings-section">
                   <h3>User Controls</h3>
                   <div className="input-group">
                     <label>
@@ -367,17 +356,26 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                         checked={askBeforeExecuting}
                         onChange={(e) => setAskBeforeExecuting(e.target.checked)}
                       />
-                      Ask Before Executing
+                      Ask Before Executing (Manual Approval)
                     </label>
                   </div>
-                  <div className="input-group">
-                    <label>Maximum Trade Size ($)</label>
-                    <input
-                      type="number"
-                      value={maxTradeSize}
-                      onChange={(e) => setMaxTradeSize(Number(e.target.value))}
-                      min="0"
-                    />
+                  <div className="pending-trades">
+                    <h4>Pending Trades ({pendingTrades.length})</h4>
+                    <div className="trades-list">
+                      {pendingTrades.map((trade, index) => (
+                        <div key={index} className="trade-item">
+                          <div className="trade-details">
+                            <span>Asset: {trade.underlying}</span>
+                            <span>Trade Size: $${trade.scaledTradeSize.toFixed(2)}</span>
+                            <span>Required Margin: $${trade.requiredMargin.toFixed(2)}</span>
+                          </div>
+                          <div className="trade-actions">
+                            <button onClick={() => approvePendingTrade(index)}>Approve</button>
+                            <button onClick={() => setPendingTrades(prev => prev.filter((_, i) => i !== index))}>Reject</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -385,7 +383,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
 
             {isReplicationEnabled && (
               <div className="log-container">
-                <h3>Replication Logs</h3>
+                <h3>Replication Activity</h3>
                 <div className="logs">
                   {logs.map((log, index) => (
                     <LogEntryComponent key={index} log={log} />
@@ -393,55 +391,9 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                 </div>
               </div>
             )}
-
-            <div className="how-it-works">
-              <div className="section-header">
-                <h2>How It Works</h2>
-              </div>
-
-              <div className="steps">
-                <div className="step">
-                  <div className="step-number">1</div>
-                  <div className="step-content">
-                    <h3>Liquidation Shield</h3>
-                    <p>Before executing any trade, the system calculates the required margin based on the trade size and asset risk. If your real account doesn't have enough balance, the trade will be blocked.</p>
-                  </div>
-                </div>
-                <div className="step">
-                  <div className="step-number">2</div>
-                  <div className="step-content">
-                    <h3>Dynamic Scaling</h3>
-                    <p>You can choose between two scaling modes:</p>
-                    <ul>
-                      <li><strong>Auto-Scale:</strong> Reduces trade size to match your real account balance</li>
-                      <li><strong>Fixed % Risk:</strong> Caps all trades at a percentage of your real account balance</li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="step">
-                  <div className="step-number">3</div>
-                  <div className="step-content">
-                    <h3>User Controls</h3>
-                    <p>You have full control with options to approve each trade and set a maximum trade size.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
-
-      <CustomModal
-        isOpen={showConfirmationModal}
-        onClose={() => setShowConfirmationModal(false)}
-        title="Enable Trade Replication"
-      >
-        <p>Are you sure you want to enable trade replication? This will automatically execute demo trades in your real account with the configured safeguards.</p>
-        <div className="modal-actions">
-          <button className="btn-secondary" onClick={() => setShowConfirmationModal(false)}>Cancel</button>
-          <button className="btn-primary" onClick={() => handleReplicationToggle(true)}>Enable</button>
-        </div>
-      </CustomModal>
     </div>
   );
 });
