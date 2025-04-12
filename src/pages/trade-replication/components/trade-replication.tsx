@@ -338,229 +338,131 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     );
   };
 
-  return (
-    <div className="trade-replication-container">
-      <div className="container">
-        <div className="main-content">
-          <div className="scroll-container">
-            <div className="replication-header">
-              <div className="header-left">
-                <h2>Trade Replication</h2>
-                <div className="account-status">
-                  <div className="account-card demo-account">
-                    <div className="account-icon">
-                      <span className="demo-icon">Demo</span>
-                    </div>
-                    <div className="account-info">
-                      <div className="account-label">Demo Account</div>
-                      <div className="account-balance">${demoBalance.toFixed(2)}</div>
-                    </div>
-                    <div className="account-status-indicator">
-                      <span className="status-dot" style={{ backgroundColor: isActiveAccountDemo ? '#28a745' : '#ced4da' }}></span>
-                      <span className="status-text">{isActiveAccountDemo ? 'Active' : 'Inactive'}</span>
-                    </div>
-                  </div>
-                  <div className="account-card real-account">
-                    <div className="account-icon">
-                      <span className="real-icon">Real</span>
-                    </div>
-                    <div className="account-info">
-                      <div className="account-label">Real Account</div>
-                      <div className="account-balance">${realBalance.toFixed(2)}</div>
-                    </div>
-                    <div className="account-status-indicator">
-                      <span className="status-dot" style={{ backgroundColor: !isActiveAccountDemo ? '#28a745' : '#ced4da' }}></span>
-                      <span className="status-text">{!isActiveAccountDemo ? 'Active' : 'Inactive'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="toggle-container">
-                <ToggleSwitch
-                  isEnabled={isReplicationEnabled}
-                  onToggle={handleReplicationToggle}
-                  label="Enable Trade Replication"
-                  disabled={isProcessing}
-                />
-              </div>
-            </div>
+  const renderHeader = () => (
+    <div className="trade-replication__header">
+      <h1>Trade Replication</h1>
+      <p>Automatically replicate demo trades to your real account</p>
+      <div className="toggle-container" style={{ marginTop: '1rem' }}>
+        <ToggleSwitch
+          isEnabled={isReplicationEnabled}
+          onToggle={handleReplicationToggle}
+          label="Enable Trade Replication"
+          disabled={isProcessing}
+        />
+      </div>
+    </div>
+  );
 
-            {isReplicationEnabled && (
-              <div className="copy-trading-section">
-                <div className="grid-container">
-                  {/* Account Status Grid */}
-                  <div className="grid-item account-status">
-                    <div className="grid-header">
-                      <h3>Account Status</h3>
-                      <div className="status-indicator">
-                        <span className="status-dot" style={{ backgroundColor: isActiveAccountDemo ? '#28a745' : '#ced4da' }}></span>
-                        <span className="status-text">{isActiveAccountDemo ? 'Demo Active' : 'Real Active'}</span>
-                      </div>
-                    </div>
-                    <div className="account-grid">
-                      <div className="account-cell">
-                        <div className="account-icon demo-icon">Demo</div>
-                        <div className="account-info">
-                          <div className="balance">${demoBalance.toFixed(2)}</div>
-                          <div className="label">Demo Account</div>
-                        </div>
-                      </div>
-                      <div className="account-cell">
-                        <div className="account-icon real-icon">Real</div>
-                        <div className="account-info">
-                          <div className="balance">${realBalance.toFixed(2)}</div>
-                          <div className="label">Real Account</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Trade Settings Grid */}
-                  <div className="grid-item trade-settings">
-                    <div className="grid-header">
-                      <h3>Trade Settings</h3>
-                      <div className="settings-info">Configure trade replication parameters</div>
-                    </div>
-                    <div className="settings-grid">
-                      <div className="settings-section">
-                        <h3>Configure trade replication parameters</h3>
-                        <div className="settings-group">
-                          <div className="scaling-mode">
-                            <h4>Scaling Mode</h4>
-                            <div className="radio-group">
-                              <label>
-                                <input type="radio" name="scaling" checked={scalingMode === 'auto'} onChange={() => setScalingMode('auto')} />
-                                Auto Scale
-                              </label>
-                              <label>
-                                <input type="radio" name="scaling" checked={scalingMode === 'fixed'} onChange={() => setScalingMode('fixed')} />
-                                Fixed Risk %
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="settings-section">
-                        <h4>Trade Controls</h4>
-                        <div className="control-group">
-                          <div className="control-item">
-                            <label>
-                              <input type="checkbox" checked={askBeforeExecuting} onChange={() => setAskBeforeExecuting(!askBeforeExecuting)} />
-                              Ask Before Executing
-                            </label>
-                            <p>Requires manual approval for each trade</p>
-                          </div>
-                          <div className="control-item">
-                            <label>Maximum Trade Size ($)</label>
-                            <input type="number" value={maxTradeSize} onChange={(e) => setMaxTradeSize(Number(e.target.value))} min="1" max="1000" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="settings-section">
-                        <h4>Margin Requirements</h4>
-                        <div className="control-group">
-                          <div className="control-item">
-                            <label>Asset Risk (%)</label>
-                            <input type="number" value={assetRisk} onChange={(e) => setAssetRisk(Number(e.target.value))} min="1" max="100" />
-                          </div>
-                          <div className="control-item">
-                            <label>Margin Buffer (%)</label>
-                            <input type="number" value={marginBuffer} onChange={(e) => setMarginBuffer(Number(e.target.value))} min="1" max="100" />
-                          </div>
-                          <div className="example-calculation">
-                            <p>Example: For a $500 trade with {assetRisk}% risk, required margin = ${calculateRequiredMargin(500).toFixed(2)}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pending-trades-section">
-                        <h4>Pending Trades</h4>
-                        <div className="pending-count">{pendingTrades.length} pending</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pending Trades Grid */}
-                  <div className="grid-item pending-trades">
-                    <div className="grid-header">
-                      <h3>Pending Trades</h3>
-                      <div className="pending-count">{pendingTrades.length} pending</div>
-                    </div>
-                    <div className="trades-grid">
-                      {pendingTrades.map((trade, index) => (
-                        <div key={index} className="trade-card">
-                          <div className="trade-info">
-                            <div className="trade-icon">📊</div>
-                            <div className="trade-details">
-                              <div className="trade-asset">{trade.underlying}</div>
-                              <div className="trade-size">Trade Size: $${trade.scaledTradeSize.toFixed(2)}</div>
-                              <div className="trade-margin">Required Margin: $${trade.requiredMargin.toFixed(2)}</div>
-                            </div>
-                            <div className="trade-actions">
-                              <button onClick={() => approvePendingTrade(index)} className="approve-btn">
-                                <span className="action-icon">✅</span>
-                                Approve
-                              </button>
-                              <button onClick={() => setPendingTrades(prev => prev.filter((_, i) => i !== index))} className="reject-btn">
-                                <span className="action-icon">❌</span>
-                                Reject
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Activity Log Grid */}
-                  <div className="grid-item activity-log">
-                    <div className="grid-header">
-                      <h3>Activity Log</h3>
-                      <div className="log-info">Recent trade replication activity</div>
-                    </div>
-                    <div className="logs-wrapper">
-                      <div className="logs">
-                        {logs.map((log, index) => (
-                          <div key={index} className={`log-bubble ${log.level}`}>
-                            <div className="bubble-content">
-                              <div className="bubble-header">
-                                <span className="bubble-timestamp">{log.timestamp}</span>
-                                <span className="bubble-icon">
-                                  {log.level === LogLevel.INFO && <span>ℹ️</span>}
-                                  {log.level === LogLevel.WARNING && <span>⚠️</span>}
-                                  {log.level === LogLevel.ERROR && <span>❌</span>}
-                                  {log.level === LogLevel.SUCCESS && <span>✅</span>}
-                                </span>
-                              </div>
-                              <div className="bubble-message">
-                                <div className="bubble-title">
-                                  {log.level === LogLevel.INFO && 'Info'}
-                                  {log.level === LogLevel.WARNING && 'Warning'}
-                                  {log.level === LogLevel.ERROR && 'Error'}
-                                  {log.level === LogLevel.SUCCESS && 'Success'}
-                                </div>
-                                <div className="bubble-text">{log.message}</div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* P&L Display Grid */}
-                  <div className="grid-item pnl-display">
-                    <ProfitLossDisplay />
-                  </div>
-                </div>
-              </div>
-            )}
+  const renderAccountStatus = () => (
+    <div className="trade-replication__section trade-replication__account-status">
+      <div className="section-header">
+        <h3>Account Status</h3>
+      </div>
+      <div className="account-grid">
+        <div className="account-item demo-account">
+          <div className="account-info">
+            <h4>Demo Account</h4>
+            <div className="balance">${demoBalance.toFixed(2)}</div>
+            <div className="status">Active</div>
+          </div>
+        </div>
+        <div className="account-item real-account">
+          <div className="account-info">
+            <h4>Real Account</h4>
+            <div className="balance">${realBalance.toFixed(2)}</div>
+            <div className="status">{isReplicationEnabled ? 'Active' : 'Inactive'}</div>
           </div>
         </div>
       </div>
-      <Snackbar />
+    </div>
+  );
+
+  const renderTradeSettings = () => (
+    <div className="trade-replication__section trade-replication__trade-settings">
+      <div className="section-header">
+        <h3>Trade Settings</h3>
+      </div>
+      <div className="settings-container">
+        <div className="settings-grid">
+          <div className="settings-group">
+            <div className="scaling-mode">
+              <h4>Scaling Mode</h4>
+              <div className="radio-group">
+                <label>
+                  <input type="radio" name="scaling" checked={scalingMode === 'auto'} onChange={() => setScalingMode('auto')} />
+                  Auto Scale
+                </label>
+                <label>
+                  <input type="radio" name="scaling" checked={scalingMode === 'fixed'} onChange={() => setScalingMode('fixed')} />
+                  Fixed Risk %
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="settings-group">
+            <div className="control-item">
+              <label>
+                <input type="checkbox" checked={askBeforeExecuting} onChange={() => setAskBeforeExecuting(!askBeforeExecuting)} />
+                Ask Before Executing
+              </label>
+              <p>Requires manual approval for each trade</p>
+            </div>
+            
+            <div className="control-item">
+              <label>Maximum Trade Size ($)</label>
+              <input type="number" value={maxTradeSize} onChange={(e) => setMaxTradeSize(Number(e.target.value))} min="1" max="1000" />
+            </div>
+          </div>
+
+          <div className="settings-group">
+            <div className="control-item">
+              <label>Asset Risk (%)</label>
+              <input type="number" value={assetRisk} onChange={(e) => setAssetRisk(Number(e.target.value))} min="1" max="100" />
+            </div>
+            
+            <div className="control-item">
+              <label>Margin Buffer (%)</label>
+              <input type="number" value={marginBuffer} onChange={(e) => setMarginBuffer(Number(e.target.value))} min="1" max="100" />
+            </div>
+
+            <div className="example-calculation">
+              <p>Example: For a $500 trade with {assetRisk}% risk, required margin = ${calculateRequiredMargin(500).toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPnL = () => (
+    <div className="trade-replication__section trade-replication__pnl-display">
+      <div className="section-header">
+        <h3>Total P&L</h3>
+      </div>
+      <div className="profit-loss-display">
+        <div className={`pnl-value ${profitLoss >= 0 ? 'positive' : 'negative'}`}>
+          ${profitLoss.toFixed(2)}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSnackbar = () => (
+    <div className={`snackbar ${snackbarSeverity} ${snackbarOpen ? 'show' : ''}`}>
+      {snackbarMessage}
+    </div>
+  );
+
+  return (
+    <div className="trade-replication">
+      {renderHeader()}
+      <div className="trade-replication__scrollable-content">
+        {renderAccountStatus()}
+        {renderTradeSettings()}
+        {renderPnL()}
+      </div>
+      {renderSnackbar()}
     </div>
   );
 });
