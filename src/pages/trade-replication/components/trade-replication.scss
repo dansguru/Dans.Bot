@@ -271,6 +271,46 @@
   }
 }
 
+.pnl-display {
+  width: 100%;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profit-loss-display {
+  text-align: center;
+  padding: 1rem;
+  background: var(--background-primary);
+  border-radius: 6px;
+
+  .pnl-header {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .pnl-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+
+    &.positive {
+      color: #4caf50;
+      background: rgba(76, 175, 80, 0.1);
+    }
+
+    &.negative {
+      color: #f44336;
+      background: rgba(244, 67, 54, 0.1);
+    }
+  }
+}
+
 .trade-settings {
   margin: 2rem 0;
   padding: 2rem;
@@ -814,5 +854,41 @@
   .bubble-text {
     font-size: 0.875rem;
     color: var(--text-general);
+  }
+}
+
+.snackbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  opacity: 0;
+  transition: all 0.3s ease-in-out;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  &.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  &.success {
+    background-color: #4caf50;
+  }
+
+  &.error {
+    background-color: #f44336;
+  }
+
+  &.warning {
+    background-color: #ff9800;
+  }
+
+  &.info {
+    background-color: #2196f3;
   }
 }

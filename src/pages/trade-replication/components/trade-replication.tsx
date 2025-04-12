@@ -56,6 +56,12 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [demoTrades, setDemoTrades] = useState<any[]>([]);
   const [newRealBalance, setNewRealBalance] = useState(realBalance);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [trades, setTrades] = useState<any[]>([]); // Track all trades
+  const [profitLoss, setProfitLoss] = useState(0); // Track total P&L
+  const [lastTradePnl, setLastTradePnl] = useState(0); // Track last trade P&L
 
   const MIN_TRADE_SIZE = 1; // Minimum trade size in dollars
 
@@ -63,6 +69,15 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
   useEffect(() => {
     setActiveAccountType(isActiveAccountDemo ? 'demo' : 'real');
   }, [isActiveAccountDemo]);
+
+  useEffect(() => {
+    // Check real account balance when it changes
+    if (realBalance <= 0) {
+      setSnackbarMessage('Real account has insufficient funds for trade replication');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+    }
+  }, [realBalance]);
 
   // Register bot event listeners
   useEffect(() => {
@@ -78,19 +93,37 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
           // Get trade size from contract
           const tradeSize = contract.trade_size || contract.stake;
           
+          // Check if real account has sufficient balance
+          const requiredMargin = calculateRequiredMargin(tradeSize);
+          if (realBalance < requiredMargin) {
+            addLog(LogLevel.WARNING, 'Insufficient real balance for trade replication');
+            setSnackbarMessage(`Insufficient funds for trade replication. Required: $${requiredMargin.toFixed(2)}`);
+            setSnackbarSeverity('warning');
+            setSnackbarOpen(true);
+            return;
+          }
+
           // Store demo trade
           setDemoTrades(prev => [...prev, {
             ...contract,
             originalTradeSize: tradeSize,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            requiredMargin
           }]);
 
           // Process trade for real account
           processDemoTrade(contract, tradeSize);
+
+          // Add success notification
+          setSnackbarMessage('Trade replicated successfully');
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           addLog(LogLevel.ERROR, `Failed to process demo trade: ${errorMessage}`);
-          showNotification('Failed to process demo trade', 'error');
+          setSnackbarMessage(`Failed to replicate trade: ${errorMessage}`);
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
         }
       });
       
@@ -107,79 +140,37 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
 
   const processDemoTrade = (contract: any, tradeSize: number) => {
     try {
-      // Calculate available demo balance
-      const availableDemoBalance = demoBalance - demoTrades.reduce((acc, trade) => acc + trade.originalTradeSize, 0);
-
-      // Calculate required margin for all pending trades
-      const totalRequiredMargin = pendingTrades.reduce((acc, trade) => {
-        return acc + calculateRequiredMargin(trade.scaledTradeSize);
-      }, 0);
+      // Calculate scaled trade size based on real account balance
+      const scaledTradeSize = calculateScaledTradeSize(tradeSize);
+      const requiredMargin = calculateRequiredMargin(scaledTradeSize);
 
       // Check if real account has sufficient balance
-      const hasSufficientRealBalance = realBalance >= totalRequiredMargin;
-
-      if (!isReplicationEnabled) {
-        addLog(LogLevel.WARNING, 'Trade replication is disabled');
-        return;
-      }
-
-      if (availableDemoBalance < tradeSize) {
-        addLog(LogLevel.WARNING, 'Insufficient demo balance for trade');
-        return;
-      }
-
-      if (!hasSufficientRealBalance) {
-        addLog(LogLevel.WARNING, 'Insufficient real balance for trade replication');
-        return;
-      }
-
-      // Calculate scaled trade size based on settings
-      let scaledTradeSize = 0;
-      
-      if (scalingMode === 'auto') {
-        // Auto scaling based on real account balance
-        const effectiveDemoSize = Math.max(tradeSize, MIN_TRADE_SIZE);
-        const maxPossibleTrade = realBalance / ((assetRisk / 100) + (marginBuffer / effectiveDemoSize));
-        const scalingFactor = Math.min(1, maxPossibleTrade / effectiveDemoSize);
-        scaledTradeSize = Math.max(effectiveDemoSize * scalingFactor, MIN_TRADE_SIZE);
-      } else {
-        // Fixed percentage risk scaling
-        scaledTradeSize = (realBalance * riskPercentage) / 100;
-      }
-
-      // Check if scaled trade size exceeds max trade size
-      scaledTradeSize = Math.min(scaledTradeSize, maxTradeSize);
-
-      // Calculate required margin
-      const requiredMargin = calculateRequiredMargin(scaledTradeSize);
-      
-      // Check if we have enough balance
       if (realBalance < requiredMargin) {
-        throw new Error(`Insufficient balance. Required margin: $${requiredMargin}, Available: $${realBalance}`);
+        addLog(LogLevel.WARNING, 'Insufficient real balance for trade replication');
+        setSnackbarMessage(`Insufficient funds for trade replication. Required: $${requiredMargin.toFixed(2)}`);
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
+        return;
       }
 
-      // Add to pending trades if manual approval is required
-      if (askBeforeExecuting) {
-        setPendingTrades(prev => [...prev, {
-          ...contract,
-          demoTradeSize: tradeSize,
-          scaledTradeSize,
-          requiredMargin,
-          timestamp: new Date().toISOString()
-        }]);
-        addLog(LogLevel.INFO, `Trade added to pending approval: ${contract.underlying} - Demo: $${tradeSize} → Scaled: $${scaledTradeSize}`);
-      } else {
-        // Execute trade immediately if no approval required
-        executeTrade(contract, scaledTradeSize);
-      }
+      // Execute trade on real account
+      executeTrade(contract, scaledTradeSize);
+
+      // Update logs and notifications
+      addLog(LogLevel.SUCCESS, `Trade replicated successfully: ${contract.underlying} - $${scaledTradeSize.toFixed(2)}`);
+      setSnackbarMessage(`Trade replicated successfully: ${contract.underlying} - $${scaledTradeSize.toFixed(2)}`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addLog(LogLevel.ERROR, `Failed to process demo trade: ${errorMessage}`);
-      showNotification('Failed to process demo trade', 'error');
+      setSnackbarMessage(`Failed to replicate trade: ${errorMessage}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     }
   };
 
-  const executeTrade = (contract: any, tradeSize: number) => {
+  const executeTrade = useCallback((contract: any, tradeSize: number) => {
     try {
       // Calculate required margin
       const requiredMargin = calculateRequiredMargin(tradeSize);
@@ -201,10 +192,57 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
       
       addLog(LogLevel.SUCCESS, `Trade executed successfully: ${contract.underlying} - $${tradeSize}`);
       showNotification(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, 'success');
+
+      // Simulate trade execution (in real implementation, this would be an API call)
+      const trade = {
+        ...contract,
+        size: tradeSize,
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+      };
+
+      // Add trade to monitoring
+      setTrades(prev => [...prev, trade]);
+
+      // Simulate trade result (in real implementation, this would come from API)
+      setTimeout(() => {
+        // Simulate trade result (in real implementation, this would come from API)
+        const result = {
+          profit: Math.random() > 0.5 ? Math.random() * tradeSize * 0.05 : 0,
+          loss: Math.random() > 0.5 ? Math.random() * tradeSize * 0.05 : 0
+        };
+
+        // Update trade with result
+        const updatedTrades = trades.map(t => 
+          t.timestamp === trade.timestamp ? { ...t, result } : t
+        );
+        setTrades(updatedTrades);
+
+        // Monitor the trade
+        monitorTrade({ ...trade, result });
+      }, 2000); // Simulated delay
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addLog(LogLevel.ERROR, `Trade execution failed: ${errorMessage}`);
       showNotification('Trade execution failed', 'error');
+    }
+  }, [trades]);
+
+  const monitorTrade = (trade: any) => {
+    // Check if trade has a result
+    if (trade.result) {
+      const pnl = trade.result.profit || trade.result.loss;
+      setLastTradePnl(pnl);
+      setProfitLoss(prev => prev + pnl);
+
+      // Show P&L notification
+      setSnackbarMessage(
+        pnl > 0 
+          ? `Profit: $${pnl.toFixed(2)} from ${trade.underlying}` 
+          : `Loss: $${Math.abs(pnl).toFixed(2)} from ${trade.underlying}`
+      );
+      setSnackbarSeverity(pnl > 0 ? 'success' : 'error');
+      setSnackbarOpen(true);
     }
   };
 
@@ -256,13 +294,52 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     return (effectiveTradeSize * assetRisk / 100) + marginBuffer;
   };
 
+  const calculateScaledTradeSize = (tradeSize: number) => {
+    let scaledTradeSize = 0;
+    
+    if (scalingMode === 'auto') {
+      // Auto scaling based on real account balance
+      const effectiveDemoSize = Math.max(tradeSize, MIN_TRADE_SIZE);
+      const maxPossibleTrade = realBalance / ((assetRisk / 100) + (marginBuffer / effectiveDemoSize));
+      const scalingFactor = Math.min(1, maxPossibleTrade / effectiveDemoSize);
+      scaledTradeSize = Math.max(effectiveDemoSize * scalingFactor, MIN_TRADE_SIZE);
+    } else {
+      // Fixed percentage risk scaling
+      scaledTradeSize = (realBalance * riskPercentage) / 100;
+    }
+
+    // Check if scaled trade size exceeds max trade size
+    scaledTradeSize = Math.min(scaledTradeSize, maxTradeSize);
+
+    return scaledTradeSize;
+  };
+
   const checkMargin = (tradeSize: number) => {
     const margin = calculateRequiredMargin(tradeSize);
     return realBalance >= margin;
   };
 
+  const ProfitLossDisplay = () => {
+    return (
+      <div className="profit-loss-display">
+        <div className="pnl-header">Total P&L</div>
+        <div className={`pnl-value ${profitLoss >= 0 ? 'positive' : 'negative'}`}>
+          ${profitLoss.toFixed(2)}
+        </div>
+      </div>
+    );
+  };
+
+  const Snackbar = () => {
+    return (
+      <div className={`snackbar ${snackbarSeverity} ${snackbarOpen ? 'show' : ''}`}>
+        {snackbarMessage}
+      </div>
+    );
+  };
+
   return (
-    <div className="trade-replication">
+    <div className="trade-replication-container">
       <div className="container">
         <div className="main-content">
           <div className="scroll-container">
@@ -472,12 +549,18 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                       </div>
                     </div>
                   </div>
+
+                  {/* P&L Display Grid */}
+                  <div className="grid-item pnl-display">
+                    <ProfitLossDisplay />
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+      <Snackbar />
     </div>
   );
 });
