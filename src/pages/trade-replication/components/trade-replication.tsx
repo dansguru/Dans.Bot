@@ -15,7 +15,7 @@ interface TradeReplicationProps {
   demoBalance: number;
   realBalance: number;
   isActiveAccountDemo: boolean;
-  onReplicationChange: (isEnabled: boolean) => void;
+  onReplicationChange: (isEnabled: boolean, newBalance?: number) => void;
 }
 
 enum LogLevel {
@@ -54,6 +54,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
   const [pendingTrades, setPendingTrades] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [newRealBalance, setNewRealBalance] = useState(realBalance);
 
   const MIN_TRADE_SIZE = 1; // Minimum trade size in dollars
 
@@ -69,17 +70,64 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
       const unsubscribeFunctions: (() => void)[] = [];
       
       // Register event listeners and store unsubscribe functions
-      const unsubscribeBotContract = globalObserver.register('bot.contract', onBotContractEvent);
+      const unsubscribeBotContract = globalObserver.register('bot.contract', (contract: any) => {
+        if (!isReplicationEnabled) return;
+
+        try {
+          // Get trade size from contract
+          const tradeSize = contract.trade_size || contract.stake;
+          
+          // Calculate scaled trade size
+          const scaledTradeSize = calculateScaledTrade(tradeSize);
+          
+          // Check if we have enough margin
+          const requiredMargin = calculateRequiredMargin(scaledTradeSize);
+          if (realBalance < requiredMargin) {
+            addLog(`Insufficient margin: Required $${requiredMargin}, Available $${realBalance}`, LogLevel.ERROR);
+            showNotification('Insufficient margin for trade', 'error');
+            return;
+          }
+
+          // Add to pending trades if manual approval is required
+          if (askBeforeExecuting) {
+            setPendingTrades(prev => [...prev, {
+              ...contract,
+              demoTradeSize: tradeSize,
+              scaledTradeSize,
+              requiredMargin
+            }]);
+            addLog(`Trade added to pending approval: ${contract.underlying} - $${scaledTradeSize}`, LogLevel.INFO);
+          } else {
+            // Execute trade immediately if no approval required
+            executeTrade(contract, scaledTradeSize);
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          addLog(`Failed to process trade: ${errorMessage}`, LogLevel.ERROR);
+          showNotification('Trade processing failed', 'error');
+        }
+      });
+      
       if (typeof unsubscribeBotContract === 'function') {
         unsubscribeFunctions.push(unsubscribeBotContract);
       }
       
-      const unsubscribeBotRunning = globalObserver.register('bot.running', onBotRunningEvent);
+      const unsubscribeBotRunning = globalObserver.register('bot.running', () => {
+        if (!isReplicationEnabled) return;
+        showNotification('Bot started - Trade replication is active', 'info');
+        addLog('Bot started - Trade replication is active', LogLevel.INFO);
+      });
+      
       if (typeof unsubscribeBotRunning === 'function') {
         unsubscribeFunctions.push(unsubscribeBotRunning);
       }
       
-      const unsubscribeBotStop = globalObserver.register('bot.stop', onBotStopEvent);
+      const unsubscribeBotStop = globalObserver.register('bot.stop', () => {
+        if (!isReplicationEnabled) return;
+        showNotification('Bot stopped - Trade replication paused', 'info');
+        addLog('Bot stopped - Trade replication paused', LogLevel.INFO);
+      });
+      
       if (typeof unsubscribeBotStop === 'function') {
         unsubscribeFunctions.push(unsubscribeBotStop);
       }
@@ -89,7 +137,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
         unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
       };
     }
-  }, [isReplicationEnabled]);
+  }, [isReplicationEnabled, realBalance, askBeforeExecuting]);
 
   const addLog = (message: string, level: LogLevel) => {
     const logEntry: LogEntry = {
@@ -100,90 +148,46 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     setLogs(prevLogs => [...prevLogs, logEntry]);
   };
 
-  const handleReplicationToggle = async (value: boolean) => {
+  const handleReplicationToggle = (value: boolean) => {
     if (value) {
-      // Check if real account has sufficient balance
-      if (realBalance < minBalanceThreshold) {
-        showNotification(
-          `Insufficient balance in real account. Required minimum: $${minBalanceThreshold}, Current: $${realBalance.toFixed(2)}`,
-          'warning'
-        );
-        addLog(`Insufficient balance in real account. Required minimum: $${minBalanceThreshold}, Current: $${realBalance.toFixed(2)}`, LogLevel.WARNING);
-        return;
-      }
-
-      const confirmed = window.confirm('Are you sure you want to enable trade replication? This will automatically execute demo trades in your real account.');
-      if (!confirmed) {
-        return;
-      }
-
-      try {
-        setIsProcessing(true);
-        addLog('Attempting to enable trade replication...', LogLevel.INFO);
-        
-        // Add API call to enable replication
-        const response = await fetch('/api/trade-replication/enable', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            apiKey: REAL_API_KEY,
-            settings: {
-              scalingMode,
-              riskPercentage,
-              minBalanceThreshold,
-              askBeforeExecuting,
-              maxTradeSize,
-              assetRisk,
-              marginBuffer,
-            }
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to enable trade replication');
-        }
-
-        addLog('Trade replication successfully enabled', LogLevel.SUCCESS);
-        setIsReplicationEnabled(true);
-        onReplicationChange(true);
-        showNotification('Trade replication has been enabled', 'success');
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        addLog(`Failed to enable trade replication: ${errorMessage}`, LogLevel.ERROR);
-        showNotification('Failed to enable trade replication', 'error');
-      } finally {
-        setIsProcessing(false);
-      }
+      // No need for API calls, just enable/disable locally
+      setIsReplicationEnabled(true);
+      onReplicationChange(true);
+      showNotification('Trade replication has been enabled', 'success');
+      addLog('Trade replication successfully enabled', LogLevel.SUCCESS);
     } else {
-      try {
-        setIsProcessing(true);
-        addLog('Attempting to disable trade replication...', LogLevel.INFO);
-        
-        // Add API call to disable replication
-        const response = await fetch('/api/trade-replication/disable', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
+      setIsReplicationEnabled(false);
+      onReplicationChange(false);
+      showNotification('Trade replication has been disabled', 'info');
+      addLog('Trade replication successfully disabled', LogLevel.INFO);
+    }
+  };
 
-        if (!response.ok) {
-          throw new Error('Failed to disable trade replication');
-        }
-
-        addLog('Trade replication successfully disabled', LogLevel.SUCCESS);
-        setIsReplicationEnabled(false);
-        onReplicationChange(false);
-        showNotification('Trade replication has been disabled', 'info');
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        addLog(`Failed to disable trade replication: ${errorMessage}`, LogLevel.ERROR);
-        showNotification('Failed to disable trade replication', 'error');
-      } finally {
-        setIsProcessing(false);
+  const executeTrade = (contract: any, tradeSize: number) => {
+    try {
+      // Calculate required margin
+      const requiredMargin = calculateRequiredMargin(tradeSize);
+      
+      // Check if we have enough balance
+      if (realBalance < requiredMargin) {
+        throw new Error(`Insufficient balance. Required margin: $${requiredMargin}, Available: $${realBalance}`);
       }
+
+      // Execute the trade
+      addLog(`Executing trade: ${contract.underlying} - $${tradeSize}`, LogLevel.INFO);
+      showNotification(`Executing trade: ${contract.underlying} - $${tradeSize}`, 'info');
+      
+      // Update real balance after successful trade
+      const newBalance = realBalance - tradeSize;
+      onReplicationChange(false); // Temporarily disable replication during trade
+      onReplicationChange(true, newBalance);  // Re-enable replication after trade
+      
+      addLog(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, LogLevel.SUCCESS);
+      showNotification(`Trade executed successfully: ${contract.underlying} - $${tradeSize}`, 'success');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addLog(`Trade execution failed: ${errorMessage}`, LogLevel.ERROR);
+      showNotification('Trade execution failed', 'error');
     }
   };
 
@@ -212,85 +216,6 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
     return scaledSize;
   };
 
-  const executeTrade = async (contract: any, demoTradeSize: number) => {
-    try {
-      setIsProcessing(true);
-      
-      // Calculate scaled trade size while respecting minimum trade size
-      const scaledTradeSize = calculateScaledTrade(demoTradeSize);
-      
-      // Check if we have enough margin for the scaled trade
-      if (!checkMargin(scaledTradeSize)) {
-        showNotification(`Insufficient margin for trade. Required: $${calculateRequiredMargin(scaledTradeSize).toFixed(2)}, Available: $${realBalance.toFixed(2)}`, 'warning');
-        addLog(`Insufficient margin for trade. Required: $${calculateRequiredMargin(scaledTradeSize).toFixed(2)}, Available: $${realBalance.toFixed(2)}`, LogLevel.WARNING);
-        return;
-      }
-
-      addLog(`Executing trade: ${contract.underlying} - Demo: $${demoTradeSize} → Scaled: $${scaledTradeSize.toFixed(2)}`, LogLevel.INFO);
-
-      // Execute the trade with the scaled size
-      const response = await fetch('/api/trade-execute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey: REAL_API_KEY,
-          contract,
-          tradeSize: scaledTradeSize
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to execute trade');
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        addLog(`Trade executed successfully: ${contract.underlying} - $${scaledTradeSize.toFixed(2)}`, LogLevel.SUCCESS);
-        showNotification(`Trade executed successfully: ${contract.underlying} - $${scaledTradeSize.toFixed(2)}`, 'success');
-      } else {
-        addLog(`Trade execution failed: ${data.error || 'Unknown error'}`, LogLevel.ERROR);
-        showNotification('Trade execution failed', 'error');
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      addLog(`Trade execution failed: ${errorMessage}`, LogLevel.ERROR);
-      showNotification('Trade execution failed', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const onBotContractEvent = (contract: any) => {
-    if (!isReplicationEnabled) return;
-
-    // Get demo trade size from contract
-    const demoTradeSize = contract.trade_size || 0;
-    
-    // Skip if demo trade size is too small
-    if (demoTradeSize < MIN_TRADE_SIZE) {
-      addLog(`Skipping trade: Demo trade size (${demoTradeSize}) is below minimum (${MIN_TRADE_SIZE})`, LogLevel.INFO);
-      return;
-    }
-
-    // Calculate scaled trade size
-    const scaledTradeSize = calculateScaledTrade(demoTradeSize);
-
-    // Add to pending trades if manual approval is required
-    if (askBeforeExecuting) {
-      setPendingTrades(prev => [...prev, {
-        ...contract,
-        demoTradeSize,
-        scaledTradeSize
-      }]);
-      addLog(`Trade added to pending approval: ${contract.underlying} - $${scaledTradeSize.toFixed(2)}`, LogLevel.INFO);
-    } else {
-      // Execute immediately if no approval required
-      executeTrade(contract, demoTradeSize);
-    }
-  };
-
   const onBotRunningEvent = () => {
     if (!isReplicationEnabled) return;
     showNotification('Bot started - Trade replication is active', 'info');
@@ -312,11 +237,11 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
   const approvePendingTrade = (tradeIndex: number) => {
     const trade = pendingTrades[tradeIndex];
     if (trade) {
-      executeTrade(trade, trade.demoTradeSize);
+      // Execute the trade with the scaled size
+      executeTrade(trade, trade.scaledTradeSize);
       
       // Remove the approved trade from pending list
       setPendingTrades(prev => prev.filter((_, index) => index !== tradeIndex));
-      showNotification(`Trade approved: ${trade.underlying} - $${trade.scaledTradeSize}`, 'success');
     }
   };
 
@@ -346,7 +271,7 @@ export const TradeReplication: React.FC<TradeReplicationProps> = observer(({
                   </div>
                   <div className="balance-item">
                     <div className="balance-label">Real Balance</div>
-                    <div className="balance-value">${realBalance.toFixed(2)}</div>
+                    <div className="balance-value">${newRealBalance.toFixed(2)}</div>
                     <div className="active-indicator">Real Account</div>
                   </div>
                 </div>
